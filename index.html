@@ -1,0 +1,4325 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Planta Embotelladora de Cerveza en Vidrio — Simulación WebXR con NPCs Conscientes</title>
+  <style>
+    :root {
+      --bg-panel: rgba(15, 23, 42, 0.90);
+      --bg-card: rgba(30, 41, 59, 0.94);
+      --border-glass: rgba(245, 158, 11, 0.45);
+      --accent-amber: #f59e0b;
+      --accent-gold: #fbbf24;
+      --accent-cyan: #06b6d4;
+      --accent-green: #10b981;
+      --accent-red: #ef4444;
+      --text-main: #f8fafc;
+      --text-muted: #cbd5e1;
+      --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    body, html {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: #1e293b;
+      font-family: var(--font-sans);
+      color: var(--text-main);
+    }
+
+    #canvas-container {
+      position: fixed;
+      inset: 0;
+      z-index: 1;
+    }
+
+    /* Top Header HUD */
+    #top-hud {
+      position: fixed;
+      top: 12px;
+      left: 12px;
+      right: 12px;
+      z-index: 10;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 12px;
+      pointer-events: none;
+    }
+
+    .hud-box {
+      background: var(--bg-panel);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid var(--border-glass);
+      border-radius: 12px;
+      padding: 10px 14px;
+      pointer-events: auto;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.45);
+    }
+
+    .brand-header {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      max-width: 430px;
+    }
+
+    .brand-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--accent-gold);
+    }
+
+    .status-dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: var(--accent-green);
+      box-shadow: 0 0 8px var(--accent-green);
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.55; transform: scale(1.18); }
+    }
+
+    .brand-title {
+      font-size: 15px;
+      font-weight: 800;
+      color: #fff;
+      line-height: 1.2;
+    }
+
+    .brand-subtitle {
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    /* Top Right Controls & SCADA Metrics */
+    .top-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      justify-content: flex-end;
+    }
+
+    .metric-pill {
+      background: rgba(15, 23, 42, 0.9);
+      border: 1px solid rgba(148, 163, 184, 0.3);
+      border-radius: 8px;
+      padding: 5px 9px;
+      display: flex;
+      flex-direction: column;
+      min-width: 88px;
+    }
+
+    .metric-label {
+      font-size: 10px;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      letter-spacing: 0.05em;
+    }
+
+    .metric-val {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--accent-gold);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .btn {
+      background: rgba(30, 41, 59, 0.92);
+      color: var(--text-main);
+      border: 1px solid rgba(245, 158, 11, 0.45);
+      padding: 8px 12px;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.18s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .btn:hover {
+      background: rgba(245, 158, 11, 0.22);
+      border-color: var(--accent-gold);
+      transform: translateY(-1px);
+    }
+
+    .btn.active {
+      background: var(--accent-amber);
+      color: #070b12;
+      border-color: var(--accent-gold);
+      font-weight: 700;
+    }
+
+    .btn-vr {
+      background: linear-gradient(135deg, #06b6d4, #2563eb);
+      border: 1px solid #38bdf8;
+      color: #fff;
+      font-weight: 700;
+      padding: 8px 13px;
+      box-shadow: 0 0 15px rgba(6, 182, 212, 0.4);
+    }
+
+    .btn-mic {
+      background: linear-gradient(135deg, #059669, #0284c7);
+      border: 1px solid #34d399;
+      color: #fff;
+      font-weight: 700;
+    }
+
+    .btn-mic.listening {
+      background: linear-gradient(135deg, #dc2626, #db2777);
+      border-color: #fda4af;
+      animation: pulse 0.9s infinite;
+    }
+
+    .btn-danger {
+      border-color: rgba(239, 68, 68, 0.6);
+      color: #fca5a5;
+    }
+    .btn-danger:hover {
+      background: rgba(239, 68, 68, 0.25);
+      border-color: #ef4444;
+    }
+
+    .btn-repair {
+      background: linear-gradient(135deg, #dc2626, #ea580c);
+      border: 1px solid #fca5a5;
+      color: #fff;
+      font-weight: 800;
+      animation: pulse 1.2s infinite;
+    }
+
+    /* Left Navigation Panel (Stations + NPCs) */
+    #left-drawer {
+      position: fixed;
+      top: 102px;
+      left: 12px;
+      bottom: 80px;
+      width: 275px;
+      z-index: 10;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      pointer-events: none;
+      transition: transform 0.25s ease;
+    }
+
+    #left-drawer.collapsed {
+      transform: translateX(-295px);
+    }
+
+    .drawer-section {
+      background: var(--bg-panel);
+      backdrop-filter: blur(12px);
+      border: 1px solid var(--border-glass);
+      border-radius: 12px;
+      padding: 10px;
+      pointer-events: auto;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .drawer-section.stations-list {
+      flex: 1;
+      min-height: 0;
+    }
+
+    .section-title {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--accent-gold);
+      margin-bottom: 8px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .scroll-list {
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      padding-right: 4px;
+    }
+
+    .scroll-list::-webkit-scrollbar {
+      width: 4px;
+    }
+    .scroll-list::-webkit-scrollbar-thumb {
+      background: rgba(245, 158, 11, 0.4);
+      border-radius: 4px;
+    }
+
+    .nav-item {
+      background: rgba(15, 23, 42, 0.75);
+      border: 1px solid rgba(148, 163, 184, 0.22);
+      border-radius: 8px;
+      padding: 7px 10px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      text-align: left;
+    }
+
+    .nav-item:hover, .nav-item.selected {
+      background: rgba(245, 158, 11, 0.18);
+      border-color: var(--accent-amber);
+    }
+
+    .nav-item.broken {
+      background: rgba(220, 38, 38, 0.28);
+      border-color: #ef4444;
+    }
+
+    .nav-code {
+      font-size: 11px;
+      font-weight: 800;
+      padding: 2px 6px;
+      border-radius: 4px;
+      background: rgba(245, 158, 11, 0.2);
+      color: var(--accent-gold);
+      white-space: nowrap;
+    }
+
+    .nav-code.skid {
+      background: rgba(16, 185, 129, 0.2);
+      color: #34d399;
+    }
+
+    .nav-code.npc {
+      background: rgba(6, 182, 212, 0.2);
+      color: #38bdf8;
+    }
+
+    .nav-name {
+      font-size: 12px;
+      font-weight: 600;
+      color: #e2e8f0;
+      line-height: 1.2;
+    }
+
+    .nav-sub {
+      font-size: 10px;
+      color: var(--text-muted);
+    }
+
+    /* Right Inspector / Dialogue Modal Card */
+    #inspector-panel {
+      position: fixed;
+      top: 102px;
+      right: 12px;
+      width: 400px;
+      max-height: calc(100vh - 185px);
+      z-index: 12;
+      background: var(--bg-panel);
+      backdrop-filter: blur(14px);
+      border: 1px solid var(--border-glass);
+      border-radius: 14px;
+      padding: 15px;
+      display: flex;
+      flex-direction: column;
+      gap: 11px;
+      overflow-y: auto;
+      box-shadow: 0 15px 35px rgba(0, 0, 0, 0.65);
+      transition: opacity 0.2s ease, transform 0.2s ease;
+    }
+
+    #inspector-panel.hidden {
+      opacity: 0;
+      pointer-events: none;
+      transform: translateX(20px);
+    }
+
+    .inspector-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 8px;
+      border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+      padding-bottom: 10px;
+    }
+
+    .inspector-tag {
+      font-size: 11px;
+      font-weight: 800;
+      text-transform: uppercase;
+      padding: 3px 8px;
+      border-radius: 5px;
+      background: rgba(245, 158, 11, 0.2);
+      color: var(--accent-gold);
+      display: inline-block;
+      margin-bottom: 4px;
+    }
+
+    .inspector-title {
+      font-size: 16px;
+      font-weight: 800;
+      color: #fff;
+    }
+
+    .inspector-subtitle {
+      font-size: 12px;
+      color: var(--accent-cyan);
+      font-weight: 600;
+    }
+
+    .close-btn {
+      background: transparent;
+      border: 1px solid rgba(148, 163, 184, 0.3);
+      color: var(--text-muted);
+      width: 28px;
+      height: 28px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .close-btn:hover {
+      color: #fff;
+      border-color: #fff;
+    }
+
+    .inspector-body {
+      font-size: 13px;
+      line-height: 1.5;
+      color: #e2e8f0;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .spec-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .spec-box {
+      background: rgba(15, 23, 42, 0.78);
+      border: 1px solid rgba(148, 163, 184, 0.22);
+      border-radius: 8px;
+      padding: 8px;
+    }
+
+    .spec-box-label {
+      font-size: 10px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+    }
+
+    .spec-box-val {
+      font-size: 12px;
+      font-weight: 700;
+      color: #f8fafc;
+      margin-top: 2px;
+    }
+
+    .alert-breakdown-box {
+      background: rgba(185, 28, 28, 0.28);
+      border: 1px solid #ef4444;
+      border-radius: 8px;
+      padding: 10px 12px;
+      color: #fecaca;
+      font-size: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .repair-progress-bar-wrap {
+      width: 100%;
+      height: 10px;
+      background: rgba(15, 23, 42, 0.9);
+      border-radius: 999px;
+      overflow: hidden;
+      border: 1px solid rgba(251, 191, 36, 0.5);
+    }
+
+    .repair-progress-bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #f59e0b, #10b981);
+      width: 0%;
+      transition: width 0.1s linear;
+    }
+
+    /* Dialogue Chat UI inside Inspector */
+    .dialogue-box {
+      background: rgba(15, 23, 42, 0.92);
+      border-left: 3px solid var(--accent-cyan);
+      border-radius: 8px;
+      padding: 10px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .dialogue-speaker {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--accent-gold);
+      text-transform: uppercase;
+    }
+
+    .dialogue-text {
+      font-size: 13px;
+      color: #f1f5f9;
+      font-style: italic;
+      line-height: 1.45;
+    }
+
+    .dialogue-options {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-top: 4px;
+    }
+
+    .dialogue-opt-btn {
+      background: rgba(6, 182, 212, 0.15);
+      border: 1px solid rgba(6, 182, 212, 0.45);
+      color: #e0f2fe;
+      padding: 7px 10px;
+      border-radius: 8px;
+      font-size: 11.5px;
+      font-weight: 600;
+      text-align: left;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .dialogue-opt-btn:hover {
+      background: rgba(6, 182, 212, 0.3);
+      border-color: #38bdf8;
+    }
+
+    .voice-Input-row {
+      display: flex;
+      gap: 6px;
+      margin-top: 4px;
+    }
+
+    .voice-text-input {
+      flex: 1;
+      background: rgba(15, 23, 42, 0.9);
+      border: 1px solid rgba(148, 163, 184, 0.35);
+      border-radius: 8px;
+      padding: 7px 10px;
+      color: #fff;
+      font-size: 12px;
+      outline: none;
+    }
+
+    .voice-text-input:focus {
+      border-color: var(--accent-cyan);
+    }
+
+    .anim-pills {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .anim-pill {
+      background: rgba(30, 41, 59, 0.9);
+      border: 1px solid rgba(148, 163, 184, 0.3);
+      color: #cbd5e1;
+      padding: 5px 8px;
+      border-radius: 6px;
+      font-size: 11px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .anim-pill:hover, .anim-pill.active {
+      background: rgba(16, 185, 129, 0.25);
+      border-color: #10b981;
+      color: #fff;
+    }
+
+    /* Bottom Help & Simulation Bar */
+    #bottom-bar {
+      position: fixed;
+      bottom: 12px;
+      left: 12px;
+      right: 12px;
+      z-index: 10;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      pointer-events: none;
+    }
+
+    .sim-controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 7px;
+      align-items: center;
+    }
+
+    .controls-hint {
+      font-size: 11px;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .key-badge {
+      background: rgba(255, 255, 255, 0.12);
+      border: 1px solid rgba(255, 255, 255, 0.25);
+      padding: 2px 6px;
+      border-radius: 4px;
+      color: #fff;
+      font-weight: 700;
+      font-size: 10px;
+    }
+
+    /* Mobile Virtual Joystick */
+    #mobile-joystick-zone {
+      position: fixed;
+      bottom: 78px;
+      left: 24px;
+      width: 110px;
+      height: 110px;
+      border-radius: 50%;
+      background: rgba(15, 23, 42, 0.55);
+      border: 2px solid rgba(245, 158, 11, 0.45);
+      z-index: 15;
+      display: none;
+      touch-action: none;
+    }
+
+    #mobile-joystick-knob {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 44px;
+      height: 44px;
+      margin-top: -22px;
+      margin-left: -22px;
+      border-radius: 50%;
+      background: rgba(245, 158, 11, 0.85);
+      box-shadow: 0 0 12px rgba(245, 158, 11, 0.6);
+      pointer-events: none;
+    }
+
+    /* 3D Floating Labels container */
+    #labels-container {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 5;
+      overflow: hidden;
+    }
+
+    .world-label {
+      position: absolute;
+      transform: translate(-50%, -100%);
+      background: rgba(15, 23, 42, 0.92);
+      border: 1px solid rgba(245, 158, 11, 0.65);
+      color: #fff;
+      padding: 4px 8px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 700;
+      white-space: nowrap;
+      pointer-events: auto;
+      cursor: pointer;
+      transition: transform 0.1s ease, border-color 0.15s ease;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.45);
+    }
+
+    .world-label:hover {
+      border-color: #38bdf8;
+      transform: translate(-50%, -105%) scale(1.06);
+      z-index: 20;
+    }
+
+    .world-label.broken-label {
+      background: rgba(185, 28, 28, 0.96);
+      border-color: #fca5a5;
+      animation: pulse 0.9s infinite;
+    }
+
+    .world-label.npc-label {
+      border-color: rgba(6, 182, 212, 0.75);
+      background: rgba(8, 47, 73, 0.94);
+    }
+
+    .world-label.npc-speech-bubble {
+      background: rgba(15, 23, 42, 0.96);
+      border: 2px solid #38bdf8;
+      color: #fef08a;
+      max-width: 320px;
+      white-space: normal;
+      text-align: center;
+      line-height: 1.35;
+      padding: 7px 10px;
+      border-radius: 10px;
+      z-index: 18;
+    }
+
+    .world-label .tag {
+      color: var(--accent-gold);
+      margin-right: 4px;
+    }
+
+    .world-label.npc-label .tag {
+      color: #38bdf8;
+    }
+
+    /* Toast notification */
+    #toast-banner {
+      position: fixed;
+      top: 78px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 25;
+      background: rgba(15, 23, 42, 0.96);
+      border: 1px solid var(--accent-gold);
+      color: #fff;
+      padding: 8px 18px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 600;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.25s ease;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.5);
+    }
+
+    #toast-banner.visible {
+      opacity: 1;
+    }
+
+    @media (max-width: 900px) {
+      #left-drawer {
+        width: 230px;
+        top: 96px;
+      }
+      #inspector-panel {
+        width: calc(100vw - 24px);
+        right: 12px;
+        left: 12px;
+        bottom: 70px;
+        top: auto;
+        max-height: 52vh;
+      }
+      .controls-hint {
+        display: none;
+      }
+      .brand-subtitle {
+        display: none;
+      }
+    }
+  </style>
+
+  <!-- Three.js ES Module Import Map -->
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+<body>
+
+  <div id="canvas-container"></div>
+  <div id="labels-container"></div>
+  <div id="toast-banner">Sistema listo</div>
+
+  <!-- Top HUD -->
+  <header id="top-hud">
+    <div class="hud-box brand-header">
+      <div class="brand-badge">
+        <span class="status-dot" id="line-status-dot"></span>
+        <span>GEMELO DIGITAL INDUSTRIAL • WEBXR (META QUEST 2/3, PC & MÓVIL)</span>
+      </div>
+      <div class="brand-title">Línea Automatizada de Embotellado de Cerveza en Vidrio</div>
+      <div class="brand-subtitle">NPCs con Conciencia Propia, Mirada Fija al Hablar y Charla de Descanso</div>
+    </div>
+
+    <div class="hud-box top-actions">
+      <div class="metric-pill">
+        <span class="metric-label">Capacidad</span>
+        <span class="metric-val" id="metric-bph">24,000 BPH</span>
+      </div>
+      <div class="metric-pill">
+        <span class="metric-label">Riesgo Avería</span>
+        <span class="metric-val" id="metric-risk" style="color:#10b981;">Bajo (3%)</span>
+      </div>
+      <div class="metric-pill">
+        <span class="metric-label">Estado Equipos</span>
+        <span class="metric-val" id="metric-health" style="color:#10b981;">8/8 OK</span>
+      </div>
+      <div class="metric-pill">
+        <span class="metric-label">Botellas OK / Rechazo</span>
+        <span class="metric-val" id="metric-count">142 / 2</span>
+      </div>
+      <button class="btn active" id="btn-tts-toggle" title="Activar o silenciar la voz hablada de los NPCs">🔊 Voz NPC: ON</button>
+      <button class="btn" id="btn-ai-key" title="Opcional: Conectar API Key de Gemini para IA generativa ilimitada">🧠 IA Consciente</button>
+      <button class="btn" id="btn-toggle-drawer" title="Mostrar/Ocultar Mapa de Estaciones">☰ Estaciones</button>
+      <button class="btn active" id="btn-cam-mode" title="Cambiar entre Vista Orbital y Caminata 1ra Persona">🎥 Modo: Orbital</button>
+      <button class="btn btn-vr" id="btn-enter-vr">🥽 Entrar en VR (Quest 2/3)</button>
+    </div>
+  </header>
+
+  <!-- Left Drawer: Stations & NPCs -->
+  <aside id="left-drawer">
+    <div class="drawer-section stations-list">
+      <div class="section-title">
+        <span>Línea de Envasado & Skids</span>
+        <span style="font-size:10px;color:#cbd5e1;">Clic para ir</span>
+      </div>
+      <div class="scroll-list" id="station-nav-list"></div>
+    </div>
+
+    <div class="drawer-section">
+      <div class="section-title">
+        <span>Personal Operativo (NPCs)</span>
+        <span style="font-size:10px;color:#38bdf8;">Conciencia Propia</span>
+      </div>
+      <div class="scroll-list" id="npc-nav-list"></div>
+    </div>
+  </aside>
+
+  <!-- Right Inspector & NPC Dialogue Panel -->
+  <section id="inspector-panel" class="hidden">
+    <div class="inspector-header">
+      <div>
+        <span class="inspector-tag" id="insp-tag">ST-02</span>
+        <h2 class="inspector-title" id="insp-title">Monoblock Isobárico</h2>
+        <div class="inspector-subtitle" id="insp-sub">Counter-Pressure Monoblock Filler & Crown Capper</div>
+      </div>
+      <button class="close-btn" id="btn-close-inspector" title="Cerrar panel">✕</button>
+    </div>
+    <div class="inspector-body" id="insp-body"></div>
+  </section>
+
+  <!-- Mobile Joystick -->
+  <div id="mobile-joystick-zone">
+    <div id="mobile-joystick-knob"></div>
+  </div>
+
+  <!-- Bottom Simulation Controls & Keyboard/VR Guide -->
+  <footer id="bottom-bar">
+    <div class="hud-box sim-controls">
+      <button class="btn active" id="btn-sim-toggle" title="Al parar las máquinas, los 3 operadores dejan sus puestos y se reúnen en círculo en el pasillo central para charlar y tomar café">⏸ Parar Todas las Máquinas</button>
+      <button class="btn" id="btn-sim-speed" title="Solo acelera las máquinas y cintas. Mayor velocidad = mayor probabilidad de avería.">⚡ Vel. Máquinas: 1.0x</button>
+      <button class="btn btn-danger" id="btn-force-breakdown" title="Provoca una avería inmediata para ver cómo el NPC camina hacia la máquina, la repara y te explica cómo lo hizo">💥 Provocar Avería (Ver NPC Reparar)</button>
+      <button class="btn btn-mic" id="btn-global-mic" title="Hablar por micrófono con el NPC seleccionado o más cercano (o presiona la tecla V)">🎤 Hablar con NPC</button>
+      <button class="btn" id="btn-sim-reject">🎯 Rechazo FBI (ST-04)</button>
+      <button class="btn" id="btn-sim-cip">🧪 Flujo CIP 80°C</button>
+      <button class="btn" id="btn-reset-view">🏠 Vista General</button>
+    </div>
+
+    <div class="hud-box controls-hint">
+      <span><span class="key-badge">WASD</span> Caminar</span>
+      <span><span class="key-badge">V</span> Micrófono</span>
+      <span><span class="key-badge">Clic</span> Inspeccionar</span>
+      <span><span class="key-badge">Quest 2/3</span> Gatillo + Joysticks</span>
+    </div>
+  </footer>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    import { XRControllerModelFactory } from 'three/addons/webxr/XRControllerModelFactory.js';
+
+    // =========================================================================
+    // 1. ESPECIFICACIÓN TÉCNICA COMPLETA DEL DOCUMENTO + EXPLICACIONES DE REPARACIÓN
+    // =========================================================================
+    const STATIONS_DATA = [
+      {
+        id: 'ST-01',
+        name: 'Despaletizadora Automática de Botellas Vacías',
+        modelName: 'Despaletizador PHS300 (High-Level Automatic Depalletizer)',
+        manufacturer: 'PHS INNOVATE',
+        category: 'line',
+        failureReason: 'Desajuste neumático en el cabezal de ventosas y atasco de separador de cartón por exceso de velocidad.',
+        repairExplanation: '¡Listo! Ya reparé la Despaletizadora ST-01. Purgué la línea de vacío del cabezal PHS300, reemplacé dos ventosas que perdían succión por la alta velocidad y retiré el separador de cartón atascado en el bastidor.',
+        responsibleNpc: 'npc-javier',
+        pos: new THREE.Vector3(-34, 0, -4),
+        repairSpot: new THREE.Vector3(-34, 0, -1.6),
+        lookOffset: new THREE.Vector3(-34, 4.2, 5.5),
+        specs: {
+          'Ubicación': 'Cabecera de Línea (Entrada)',
+          'Operación': 'Retiro de separadores y barrido por capa',
+          'Entrada': 'Pallets con botellas de vidrio a granel',
+          'Salida': 'Cinta transportadora de alineación'
+        },
+        description: 'Recibe los pallets con botellas de vidrio vacías apiladas a granel, retira los cartones intermedios (separadores) mediante brazo de ventosas y empuja capa por capa las botellas hacia la cinta transportadora de alineación.'
+      },
+      {
+        id: 'ST-02',
+        name: 'Monoblock Isobárico de Lavado, Llenado y Tapado',
+        modelName: 'Master RS — Counter-Pressure Monoblock Filler & Crown Capper',
+        manufacturer: 'KING MACHINE (KM)',
+        category: 'line',
+        failureReason: 'Desincronización de estrella de transferencia y pérdida de contrapresión de CO₂ en torreta de llenado por sobrevelocidad.',
+        repairExplanation: '¡Reparación completada en el Monoblock ST-02! Presioné la seta de parada de emergencia del HMI, abrí la guarda acrílica frontal, retiré la botella trabada en la estrella de transferencia y recalibré la presión isobárica de CO2 a 2.8 bar.',
+        responsibleNpc: 'npc-ruben',
+        pos: new THREE.Vector3(-20, 0, -4),
+        repairSpot: new THREE.Vector3(-20, 0, -1.5),
+        lookOffset: new THREE.Vector3(-20, 3.8, 5.5),
+        specs: {
+          'Subestación 1': 'Rinser (Agua estéril / PAA + aire filtrado)',
+          'Subestación 2': 'Llenadora Isobárica (Vacío, CO₂, Snifting)',
+          'Subestación 3': 'Jetting de agua caliente + Coronadora',
+          'Dim. Sagitta': 'Ø 50–100 mm | Altura 150–320 mm'
+        },
+        description: 'Integra en una sola estructura cerrada tres subestaciones rotativas: Enjuagadora (Rinser), Llenadora Isobárica por contrapresión con doble evacuación de vacío y descompresión gradual (snifting), e inyección de micro-chorro de agua a alta presión (jetting) seguida del sellado hermético de chapa corona.'
+      },
+      {
+        id: 'ST-03',
+        name: 'Túnel de Pasteurización por Lluvia de Agua',
+        modelName: 'Túnel Térmico Multizona en Envase Cerrado',
+        manufacturer: 'Co.Mac',
+        category: 'line',
+        failureReason: 'Sobrecarga en electrobomba centrífuga de recirculación térmica (zona de 62 °C) y tensión excesiva en malla plástica.',
+        repairExplanation: '¡Túnel de Pasteurización ST-03 nuevamente en línea! Rearmé el relé térmico de la bomba centrífuga de la zona de 62 grados, limpié el filtro de las duchas superiores y destensé el variador de la malla transportadora.',
+        responsibleNpc: 'npc-lima',
+        pos: new THREE.Vector3(-3, 0, -4),
+        repairSpot: new THREE.Vector3(-3, 0, -1.5),
+        lookOffset: new THREE.Vector3(-3, 4.5, 6.8),
+        specs: {
+          'Curva Térmica': '30°C → 45°C → 60–62°C → 30°C → Amb.',
+          'Tiempo Proceso': '20 min (Esterilidad comercial 12 meses)',
+          'Capacidad Nominal': '3.000 a 90.000 envases/hora',
+          'Transporte': 'Malla plástica bajo cámaras de ducha'
+        },
+        description: 'Realiza el tratamiento térmico del producto en envase cerrado. Las botellas llenas y tapadas avanzan sobre una malla plástica atravesando cámaras de ducha de agua a temperaturas progresivas (régimen de 60°C–62°C para alcanzar las Unidades de Pasteurización - UP) y salen enfriadas a temperatura ambiente.'
+      },
+      {
+        id: 'ST-04',
+        name: 'Inspectora de Botellas Llenas, Nivel y Tapa',
+        modelName: 'FBI (Full Bottle Inspector) / Bridge Level Check',
+        manufacturer: 'METTLER TOLEDO',
+        category: 'line',
+        failureReason: 'Saturación del actuador neumático de rechazo lateral por cadencia excesiva de envases en el puente óptico.',
+        repairExplanation: '¡Inspectora FBI ST-04 reparada! Limpié los sensores ópticos del puente, purgué la electroválvula del pistón neumático de rechazo lateral y verifiqué la lectura de nivel por alta frecuencia.',
+        responsibleNpc: 'npc-lima',
+        pos: new THREE.Vector3(10, 0, -4),
+        repairSpot: new THREE.Vector3(10, 0, -1.8),
+        lookOffset: new THREE.Vector3(10, 3.0, 4.5),
+        specs: {
+          'Sensores': 'Ópticos / Rayos X / Alta Frecuencia (HF)',
+          'Cámara Lateral': 'Nivel de llenado y área de cuello/tapa',
+          'Cámara Superior': 'Presencia, color y cierre de chapa corona',
+          'Rechazo': 'Pistón neumático lateral a bandeja'
+        },
+        description: 'Sistema en puente sobre la cinta transportadora equipado con cámaras de visión superior y lateral y sensores Rayos X/HF para verificar el nivel exacto de cerveza y la presencia/deformación de la chapa corona. Dispone de un pistón neumático para el rechazo lateral automático de envases no conformes.'
+      },
+      {
+        id: 'ST-05',
+        name: 'Etiquetadora Rotativa Envolvente y Codificador',
+        modelName: 'Rotary Cold Glue / Self-Adhesive Labeler & Laser Coder',
+        manufacturer: 'Industrial Labeling Systems',
+        category: 'line',
+        failureReason: 'Rotura de bobina portadora de etiquetas autoadhesivas y desfase de disparo en el codificador láser por alta velocidad.',
+        repairExplanation: '¡Etiquetadora ST-05 lista! Empalmé la banda portadora de etiquetas autoadhesivas que se había cortado por el tirón de velocidad, ajusté el rodillo tensor y resincronicé el disparo del láser codificador de lote.',
+        responsibleNpc: 'npc-lima',
+        pos: new THREE.Vector3(18, 0, -4),
+        repairSpot: new THREE.Vector3(18, 0, -1.8),
+        lookOffset: new THREE.Vector3(18, 3.4, 4.8),
+        specs: {
+          'Tecnología': 'Autoadhesiva / Cola en frío rotativa',
+          'Zonas de Aplicación': 'Cuerpo y cuello de botella',
+          'Codificación': 'Cabezal láser grabado al vuelo',
+          'Datos Impresos': 'Fecha de vencimiento y lote de producción'
+        },
+        description: 'Aplica etiquetas autoadhesivas o de cola en frío sobre el cuerpo y cuello de la botella en rotación continua. Incluye un cabezal láser de grabado al vuelo que imprime la fecha de vencimiento y el lote de producción.'
+      },
+      {
+        id: 'ST-06',
+        name: 'Inspectora de Etiquetado por Visión Artificial',
+        modelName: 'Label Vision Inspector / Optical Quality Station (360 Inspector)',
+        manufacturer: 'TRIVISION',
+        category: 'line',
+        failureReason: 'Error de sincronismo de disparo estroboscópico en las cámaras HD 360° por exceso de velocidad en la cinta.',
+        repairExplanation: '¡Inspectora de Visión 360° ST-06 calibrada! Reinicié el procesador de imagen TRIVISION, ajusté el encoder de sincronismo estroboscópico y validé el reconocimiento OCR del código láser.',
+        responsibleNpc: 'npc-lima',
+        pos: new THREE.Vector3(25.5, 0, -4),
+        repairSpot: new THREE.Vector3(25.5, 0, -1.8),
+        lookOffset: new THREE.Vector3(25.5, 3.2, 4.5),
+        specs: {
+          'Cobertura Óptica': 'Inspección 360° con cámaras HD',
+          'Control 1': 'Correcta alineación de etiqueta',
+          'Control 2': 'Ausencia de pliegues o roturas',
+          'Control 3': 'Legibilidad OCR del código láser'
+        },
+        description: 'Estación provista de cámaras HD industriales y procesadores de imagen que inspeccionan en 360° la correcta alineación de la etiqueta, la ausencia de pliegues o roturas y la legibilidad del código láser.'
+      },
+      {
+        id: 'ST-07',
+        name: 'Encartonadora y Formadora de Cajas',
+        modelName: 'Automatic Case Packer / Drop Packer',
+        manufacturer: 'XNTU Packaging',
+        category: 'line',
+        failureReason: 'Atasco mecánico en el descenso neumático de la matriz 4×6 (24 botellas) al interior de la caja corrugada.',
+        repairExplanation: '¡Encartonadora ST-07 reparada! Liberé las guías verticales del cabezal Drop Packer, reacomodé la matriz de 4 por 6 botellas y ajusté las ventosas formadoras de cajas de cartón corrugado.',
+        responsibleNpc: 'npc-javier',
+        pos: new THREE.Vector3(33, 0, -4),
+        repairSpot: new THREE.Vector3(33, 0, -1.7),
+        lookOffset: new THREE.Vector3(33, 3.6, 5.2),
+        specs: {
+          'Agrupación': 'Matriz 4×6 = 24 botellas por caja',
+          'Material': 'Caja de cartón corrugado desplegada',
+          'Mecanismo': 'Descenso neumático / mecánico vertical',
+          'Salida': 'Cinta de rodillos hacia paletizado'
+        },
+        description: 'Agrupa las botellas terminadas en matrices (4×6 = 24 botellas), despliega la caja de cartón corrugado y desciende neumática o mecánicamente el lote completo al interior de la caja.'
+      },
+      {
+        id: 'ST-08',
+        name: 'Brazo Robótico Paletizador',
+        modelName: 'Robotic Palletizer / 6-Axis Articulated Palletizing Robot',
+        manufacturer: 'Times Brilliant',
+        category: 'line',
+        failureReason: 'Alarma de sobrepar térmico en servomotor del Eje 2 y pérdida de vacío en mordaza por aceleración brusca.',
+        repairExplanation: '¡Brazo Robótico Paletizador ST-08 reparado! Rearmé el servodrive del segundo eje tras el sobrepar por alta velocidad, limpié el filtro de vacío de la garra neumática y referencié las coordenadas sobre el Europallet.',
+        responsibleNpc: 'npc-javier',
+        pos: new THREE.Vector3(42, 0, -4),
+        repairSpot: new THREE.Vector3(42, 0, -1.5),
+        lookOffset: new THREE.Vector3(42, 4.2, 6.0),
+        specs: {
+          'Cinemática': 'Brazo articulado industrial de 6 ejes',
+          'Herramienta (EOAT)': 'Garras de vacío / mordazas neumáticas',
+          'Estibado': 'Apilado cruzado sobre Europallet',
+          'Dimensiones Pallet': '1.20 × 0.80 m (Listo para montacargas)'
+        },
+        description: 'Toma las cajas de cartón selladas provenientes de la encartonadora mediante garras de vacío/mordazas y las estiba de manera cruzada sobre pallets de madera (1.20 × 0.80 m), dejándolos listos para el montacargas.'
+      },
+      {
+        id: 'ST-CIP',
+        name: 'Sistema CIP (Cleaning In Place) Tri-Tanque',
+        modelName: 'Skid Sanitario Automático Tri-Tanque AISI 316L',
+        manufacturer: 'Co.Mac',
+        category: 'skid',
+        pos: new THREE.Vector3(-25, 0, 8.5),
+        lookOffset: new THREE.Vector3(-25, 3.8, 14.5),
+        specs: {
+          'Ubicación': 'Zona lateral de servicios (Tubería AISI 316L)',
+          'Lavado Alcalino': 'Sosa cáustica a 80 °C',
+          'Desinfección': 'Neutralización ácida y ácido peracético',
+          'Destino': 'Monoblock de llenado ST-02 y tuberías'
+        },
+        description: 'Prepara y bombea automáticamente las soluciones de lavado alcalino (Sosa cáustica a 80°C), neutralización ácida y enjuague final hacia el monoblock de llenado y tuberías sanitarias AISI 316L durante los cambios de turno o producto.'
+      },
+      {
+        id: 'ST-SAT',
+        name: 'Unidad de Ajuste de Carbonatación (CO₂ en Línea)',
+        modelName: 'Saturador / Carbonatador Analítico en Línea',
+        manufacturer: 'Co.Mac',
+        category: 'skid',
+        pos: new THREE.Vector3(-14, 0, 8.5),
+        lookOffset: new THREE.Vector3(-14, 3.5, 13.8),
+        specs: {
+          'Ubicación': 'Entre tanques BBT y Llenadora ST-02',
+          'Función': 'Control analítico e inyección fina de CO₂',
+          'Rango Operativo': '7.0 – 8.0 g/L concentración exacta',
+          'Tubería': 'Acero inoxidable sanitario AISI 316L'
+        },
+        description: 'Módulo intermedio ubicado entre los tanques de almacenamiento de cerveza brillante (BBT) y la llenadora ST-02. Realiza el control analítico e inyección fina de dióxido de carbono para ajustar la concentración de gas (g/L) exacta antes de ser envasado.'
+      }
+    ];
+
+    // =========================================================================
+    // 2. DATOS DE LOS 3 NPCS CON PERSONALIDAD, BIOGRAFÍA Y PUNTO DE REUNIÓN SOCIAL
+    // =========================================================================
+    const BREAK_MEETING_CENTER = new THREE.Vector3(-10.0, 0, 2.2);
+
+    const SOCIAL_BREAK_CHATTER = [
+      {
+        npcId: 'npc-ruben',
+        text: '¡Qué buena pausa, equipo! Aprovecho para tomarme un café bien cargado. Las 12 válvulas del Monoblock ST-02 venían sellando a 2.8 bar impecables.',
+        anim: 'Drink_Coffee'
+      },
+      {
+        npcId: 'npc-lima',
+        text: '¡Totalmente, Rubén! Yo aprovecho para hacer estiramiento de brazos (pausa activa). El túnel ST-03 mantuvo los 62 grados clavados todo el turno.',
+        anim: 'Stretch_Break'
+      },
+      {
+        npcId: 'npc-javier',
+        text: '¡Salud con este cafecito, colegas! Con la línea detenida dejé el robot de 6 ejes ST-08 en posición segura y revisé el nivel de sosa cáustica a 80 grados.',
+        anim: 'Drink_Coffee'
+      },
+      {
+        npcId: 'npc-ruben',
+        text: 'Oigan, ¿vieron qué rápido va el lote hoy? Casi no hemos tenido rechazos en el puente óptico. Este fin de semana toca asado y fútbol.',
+        anim: 'Talk_To_Colleagues'
+      },
+      {
+        npcId: 'npc-lima',
+        text: '¡Yo me apunto al asado, Javier y Rubén! Apenas el supervisor reanude las máquinas, vuelvo a muestrear el carbonatador ST-SAT.',
+        anim: 'Talk_To_Colleagues'
+      },
+      {
+        npcId: 'npc-javier',
+        text: '¡Hecho! Un descanso de 5 minutos en equipo recarga energías. Estamos listos para cuando reactiven la línea de embotellado.',
+        anim: 'Stretch_Break'
+      }
+    ];
+
+    const NPCS_DATA = [
+      {
+        id: 'npc-ruben',
+        code: 'NPC 1',
+        name: 'Rubén Maldonado',
+        alias: 'Carlos — Operador Principal de Monobloque y Llenado',
+        role: 'Operador Principal de Monobloque y Llenado',
+        stations: 'ST-02, Coronadora',
+        age: 38,
+        yearsExp: 12,
+        hometown: 'Cartagena',
+        personality: 'Apasionado por la mecánica de precisión, perfeccionista con el nivel de oxígeno disuelto, amable y siempre con buen ánimo en el turno.',
+        hobby: 'Me encanta el fútbol, el café bien cargado antes de entrar a turno y restaurar motores clásicos los fines de semana.',
+        colleaguesOpinion: 'Lima Gutiérrez es nuestra ingeniera de calidad y es súper estricta con la pasteurización; y Javier López maneja los tanques CIP y el brazo robótico con una habilidad increíble.',
+        voiceGender: 'male',
+        voicePitch: 0.92,
+        voiceRate: 1.02,
+        suitColor: 0x1d4ed8,
+        helmetColor: 0xfbbf24,
+        breakSpot: new THREE.Vector3(-11.3, 0, 1.5),
+        waypoints: [
+          { pos: new THREE.Vector3(-21.2, 0, -1.3), label: 'Punto A: Consola HMI ST-02 (monitoreando presión de CO₂ y contrapresión)', anim: 'Idle_HMI_Touch' },
+          { pos: new THREE.Vector3(-17.8, 0, -1.5), label: 'Punto B: Tolva superior de la Coronadora (verificando y recargando chapas corona)', anim: 'Pour_Caps_Hopper' },
+          { pos: new THREE.Vector3(-19.8, 0, -1.6), label: 'Punto C: Inspección visual de cabinas de acrílico (verificando flujo de botellas)', anim: 'Inspect_Glass_Panel' }
+        ],
+        animations: [
+          { id: 'Idle_HMI_Touch', desc: 'Interactuando con la pantalla táctil HMI' },
+          { id: 'Pour_Caps_Hopper', desc: 'Brazos levantados alimentando la tolva de tapas' },
+          { id: 'Inspect_Glass_Panel', desc: 'Inclinándose para inspeccionar boquillas de llenado' },
+          { id: 'Fix_Bottle_Jam', desc: 'Reparando máquina con llave mecánica' },
+          { id: 'Drink_Coffee', desc: 'Tomando café y conversando en pausa operativa' }
+        ],
+        dialogue: {
+          playerGreeting: 'Hola Rubén, ¿quién eres y qué función cumples aquí?',
+          initialResponse: '¡Hola! Me llamo Rubén Maldonado, aunque varios compañeros también me dicen Carlos. Tengo 38 años, llevo 12 años en esta planta y soy el Operador Principal del Monoblock Isobárico ST-02. Aquí lavo las botellas con agua estéril, hago doble vacío para sacar el oxígeno, lleno a contrapresión con CO2 y aplico el micro-chorro de agua caliente (jetting) antes de poner la chapa corona.',
+          options: [
+            {
+              label: '👤 ¿Cómo te llamas, cuántos años tienes y qué te gusta hacer?',
+              answer: 'Me llamo Rubén Maldonado, tengo 38 años y soy de Cartagena. Llevo 12 años cuidando este Monoblock ST-02 como si fuera mío. Fuera de la planta me gusta mucho el fútbol y restaurar motores antiguos.',
+              triggerAnim: 'Talk_To_Player'
+            },
+            {
+              label: 'A. ¿Qué pasa si falla la presión de CO2?',
+              answer: 'La cerveza generaría turbulencia excesiva y las botellas saldrían incompletas o derramando producto.',
+              triggerAnim: 'Idle_HMI_Touch'
+            },
+            {
+              label: 'B. ¿Qué haces si se atasca una botella?',
+              answer: 'Presiono la seta E-Stop del HMI, abro el acrílico de protección y retiro el vidrio dañado.',
+              triggerAnim: 'Fix_Bottle_Jam'
+            }
+          ]
+        }
+      },
+      {
+        id: 'npc-lima',
+        code: 'NPC 2',
+        name: 'Lima Gutiérrez',
+        alias: 'Técnica de Calidad y Control Pasteurización / CO₂',
+        role: 'Técnica de Calidad y Control Pasteurización / CO₂',
+        stations: 'ST-SAT, ST-03, ST-04, ST-05, ST-06',
+        age: 31,
+        yearsExp: 7,
+        hometown: 'Barranquilla',
+        personality: 'Ingeniera química detallista, alegre, curiosa y obsesionada con la calidad microbiológica y el sabor fresco de la cerveza.',
+        hobby: 'Me encanta catar distintos estilos de cerveza artesanal, correr por la playa y la fotografía.',
+        colleaguesOpinion: 'Rubén Maldonado cuida el llenado isobárico en la ST-02 con una precisión admirable, y Javier López mantiene toda la línea impecable desde el CIP hasta el paletizado.',
+        voiceGender: 'female',
+        voicePitch: 1.18,
+        voiceRate: 1.03,
+        suitColor: 0x0f766e,
+        helmetColor: 0xffffff,
+        breakSpot: new THREE.Vector3(-8.7, 0, 1.5),
+        waypoints: [
+          { pos: new THREE.Vector3(-14.0, 0, 5.8), label: 'Punto A: ST-SAT (Carbonatador en Línea): revisa manómetros e inyección de gas (7–8 g/L)', anim: 'Inspect_Gauge_Up' },
+          { pos: new THREE.Vector3(-3.0, 0, -1.0), label: 'Punto B: ST-03 (Túnel de Pasteurización): revisa displays de temperatura (60 °C–62 °C)', anim: 'Check_Clipboard_Write' },
+          { pos: new THREE.Vector3(10.2, 0, -1.2), label: 'Punto C: ST-04 / ST-06 (Inspectora FBI y Visión 360): toma muestras de botellas descartadas', anim: 'Pick_Rejected_Bottle' }
+        ],
+        animations: [
+          { id: 'Check_Clipboard_Write', desc: 'Anotando valores de temperatura y CO₂ en tabla/tablet' },
+          { id: 'Inspect_Gauge_Up', desc: 'Mirando manómetros elevados en las tuberías de acero' },
+          { id: 'Pick_Rejected_Bottle', desc: 'Recogiendo botella descartada de la bandeja de desvío' },
+          { id: 'Fix_Bottle_Jam', desc: 'Reparando y calibrando equipo en línea' },
+          { id: 'Stretch_Break', desc: 'Haciendo pausa activa y charlando con compañeros' }
+        ],
+        dialogue: {
+          playerGreeting: 'Hola Lima, ¿cómo te llamas y a qué te dedicas en la planta?',
+          initialResponse: '¡Hola! Mi nombre es Lima Gutiérrez, soy Ingeniera Química y Técnica de Calidad aquí en la embotelladora desde hace 7 años. Superviso el carbonatador ST-SAT, el Túnel de Pasteurización ST-03 donde las botellas pasan 20 minutos a 60–62°C para lograr 12 meses de vida útil, además de las inspectoras electrónicas ST-04 y ST-06.',
+          options: [
+            {
+              label: '👤 ¿Quién eres, qué edad tienes y qué estás haciendo ahora?',
+              answer: 'Soy Lima Gutiérrez, tengo 31 años y llevo 7 años asegurando que ninguna botella defectuosa salga al mercado. Me apasiona la ciencia cervecera y trabajar en equipo con Rubén y Javier.',
+              triggerAnim: 'Talk_To_Player'
+            },
+            {
+              label: 'A. ¿Cómo detectan si una botella quedó mal llena o sin tapa?',
+              answer: 'Inmediatamente después del túnel, la inspectora FBI (Full Bottle Inspector) usa sensores de visión y alta frecuencia para descartar automáticamente cualquier envase defectuoso mediante un pistón neumático.',
+              triggerAnim: 'Pick_Rejected_Bottle'
+            }
+          ]
+        }
+      },
+      {
+        id: 'npc-javier',
+        code: 'NPC 3',
+        name: 'Javier López',
+        alias: 'Ingeniero de Sanitización CIP y Almacén / Logística',
+        role: 'Ingeniero de Sanitización CIP y Almacén / Logística',
+        stations: 'ST-CIP, ST-01, ST-07, ST-08',
+        age: 44,
+        yearsExp: 16,
+        hometown: 'Medellín',
+        personality: 'Ingeniero veterano, práctico, de buen humor y súper riguroso con la seguridad química y la robótica.',
+        hobby: 'Soy fanático de la automatización robótica, el ciclismo de montaña y los asados en familia.',
+        colleaguesOpinion: 'Con Rubén Maldonado y Lima Gutiérrez formamos un equipazo: Rubén domina el Monoblock ST-02 y Lima controla toda la calidad térmica y óptica.',
+        voiceGender: 'male',
+        voicePitch: 0.85,
+        voiceRate: 1.0,
+        suitColor: 0xb45309,
+        helmetColor: 0x38bdf8,
+        breakSpot: new THREE.Vector3(-10.0, 0, 3.4),
+        waypoints: [
+          { pos: new THREE.Vector3(-25.0, 0, 5.5), label: 'Punto A: ST-CIP (Granja de Tanques de Sanitización): comprueba nivel de sosa cáustica a 80 °C', anim: 'Operate_CIP_Valves' },
+          { pos: new THREE.Vector3(-32.5, 0, -1.2), label: 'Punto B: ST-01 (Despaletizador PHS300): verifica alineación del brazo de ventosas', anim: 'Forklift_Signal' },
+          { pos: new THREE.Vector3(39.5, 0, -0.5), label: 'Punto C: ST-08 (Paletizador Robótico): revisa correcto apilado de cajas sobre Europallet', anim: 'Inspect_Robot_Arm' }
+        ],
+        animations: [
+          { id: 'Operate_CIP_Valves', desc: 'Giro manual de actuadores/válvulas en el colector del CIP' },
+          { id: 'Forklift_Signal', desc: 'Haciendo señales de paso/pausa a los montacargas' },
+          { id: 'Inspect_Robot_Arm', desc: 'Observando la trayectoria de 6 ejes del brazo articulado' },
+          { id: 'Fix_Bottle_Jam', desc: 'Reparación mecánica de despaletizador, encartonadora o robot' },
+          { id: 'Drink_Coffee', desc: 'Tomando café y charlando en pausa operativa' }
+        ],
+        dialogue: {
+          playerGreeting: 'Hola Javier, ¿quién eres y qué controlas en la fábrica?',
+          initialResponse: '¡Qué tal! Soy Javier López, tengo 44 años y llevo 16 años en la industria cervecera. Soy el Ingeniero de Sanitización CIP y Logística. Controlo los tres tanques CIP que bombean sosa cáustica a 80°C y ácido peracético para desinfectar las tuberías, y también superviso la entrada en la Despaletizadora ST-01, la Encartonadora ST-07 y el Brazo Robótico ST-08.',
+          options: [
+            {
+              label: '👤 Háblame de ti: ¿cómo te llamas y cuánto tiempo llevas aquí?',
+              answer: 'Me llamo Javier López, tengo 44 años y soy el más veterano del grupo con 16 años de experiencia. Me encanta programar el robot paletizador de 6 ejes y mantener la planta 100% esterilizada.',
+              triggerAnim: 'Talk_To_Player'
+            },
+            {
+              label: 'A. ¿Qué verificas en los extremos de la línea (ST-01 y ST-08)?',
+              answer: 'En la cabecera ST-01 superviso que el brazo de ventosas del despaletizador PHS300 retire los separadores de cartón sin atascos, y al final en la ST-08 verifico que el robot articulado de 6 ejes apile las cajas de 24 botellas de forma cruzada sobre el Europallet.',
+              triggerAnim: 'Inspect_Robot_Arm'
+            }
+          ]
+        }
+      }
+    ];
+
+    // =========================================================================
+    // 3. CEREBRO CONVERSACIONAL CON "CONCIENCIA PROPIA" Y VOZ PERSISTENTE
+    // =========================================================================
+    let ttsEnabled = true;
+    let activeNpcForVoice = 'npc-ruben';
+    let activeDialogueNpcId = null; // Mientras no sea null, ese NPC se queda quieto mirándote sin irse
+    let currentlySpeakingNpcId = null;
+    let optionalGeminiApiKey = localStorage.getItem('webxr_gemini_api_key') || '';
+
+    document.getElementById('btn-ai-key').addEventListener('click', () => {
+      const current = optionalGeminiApiKey ? ' (Actualmente configurada)' : ' (Usa el motor consciente local por defecto)';
+      const key = window.prompt(
+        `Los NPCs ya tienen Conciencia Propia integrada sin necesidad de internet.\n\nSi además deseas conectarlos a la API de Google Gemini en vivo${current}, pega tu Gemini API Key aquí (o deja vacío para usar el cerebro consciente local):`,
+        optionalGeminiApiKey
+      );
+      if (key !== null) {
+        optionalGeminiApiKey = key.trim();
+        if (optionalGeminiApiKey) {
+          localStorage.setItem('webxr_gemini_api_key', optionalGeminiApiKey);
+          showToast('🧠 API Key de Gemini guardada: Los NPCs usarán IA generativa en la nube + conciencia del estado 3D.');
+        } else {
+          localStorage.removeItem('webxr_gemini_api_key');
+          showToast('🧠 Usando el motor de Conciencia Propia local integrado (100% autónomo).');
+        }
+      }
+    });
+
+    // Guardamos la instancia global en window._activeUtterance para que el Garbage Collector del navegador NUNCA corte el audio a mitad de frase
+    function speakNpcText(npcData, text, isDirectToPlayer = true) {
+      if (!ttsEnabled || !('speechSynthesis' in window)) return;
+      try {
+        window.speechSynthesis.cancel();
+        const utter = new SpeechSynthesisUtterance(text);
+        window._activeUtterance = utter;
+        utter.lang = 'es-ES';
+        utter.pitch = npcData.voicePitch || 1.0;
+        utter.rate = npcData.voiceRate || 1.01;
+
+        const voices = window.speechSynthesis.getVoices();
+        const esVoices = voices.filter(v => v.lang.toLowerCase().startsWith('es'));
+        if (esVoices.length > 0) {
+          if (npcData.voiceGender === 'female') {
+            const fem = esVoices.find(v => /helena|sabina|paulina|laura|monica|lucia|francisca|female|mujer|natural/i.test(v.name));
+            utter.voice = fem || esVoices[0];
+          } else {
+            const male = esVoices.find(v => /pablo|jorge|raul|alvaro|diego|carlos|male|hombre/i.test(v.name));
+            utter.voice = male || esVoices[esVoices.length - 1];
+          }
+        }
+
+        const actor = npcObjectsMap.get(npcData.id);
+        utter.onstart = () => {
+          currentlySpeakingNpcId = npcData.id;
+          if (actor) {
+            actor.isSpeakingAudio = true;
+            if (isDirectToPlayer) {
+              actor.talkingToPlayer = true;
+            }
+          }
+        };
+        utter.onend = () => {
+          if (currentlySpeakingNpcId === npcData.id) {
+            currentlySpeakingNpcId = null;
+          }
+          if (actor) {
+            actor.isSpeakingAudio = false;
+          }
+        };
+        utter.onerror = () => {
+          if (actor) {
+            actor.isSpeakingAudio = false;
+          }
+        };
+
+        window.speechSynthesis.speak(utter);
+      } catch (e) {
+        console.warn('TTS error:', e);
+      }
+    }
+
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.onvoiceschanged = () => window.speechSynthesis.getVoices();
+    }
+
+    document.getElementById('btn-tts-toggle').addEventListener('click', (e) => {
+      ttsEnabled = !ttsEnabled;
+      e.currentTarget.classList.toggle('active', ttsEnabled);
+      e.currentTarget.textContent = ttsEnabled ? '🔊 Voz NPC: ON' : '🔇 Voz NPC: OFF';
+      if (!ttsEnabled && 'speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+      }
+    });
+
+    // Reconocimiento de voz (Web Speech API)
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    let recognition = null;
+    let isListeningMic = false;
+
+    if (SpeechRecognition) {
+      recognition = new SpeechRecognition();
+      recognition.lang = 'es-ES';
+      recognition.continuous = false;
+      recognition.interimResults = false;
+
+      recognition.onstart = () => {
+        isListeningMic = true;
+        updateMicButtonsState();
+        const currentNpc = NPCS_DATA.find(n => n.id === activeNpcForVoice);
+        const actor = npcObjectsMap.get(activeNpcForVoice);
+        if (actor) {
+          activeDialogueNpcId = activeNpcForVoice;
+          actor.talkingToPlayer = true;
+        }
+        showToast(`🎤 ${currentNpc ? currentNpc.name : 'El NPC'} se detuvo y te está mirando. ¡Háblale ahora!`);
+      };
+
+      recognition.onend = () => {
+        isListeningMic = false;
+        updateMicButtonsState();
+      };
+
+      recognition.onerror = () => {
+        isListeningMic = false;
+        updateMicButtonsState();
+        showToast('⚠️ No se pudo capturar el micrófono. Verifica el permiso del navegador o escribe tu pregunta en la tarjeta derecha.');
+      };
+
+      recognition.onresult = (event) => {
+        const transcript = event.results[0][0].transcript;
+        processUserQuestionToNpc(transcript, activeNpcForVoice);
+      };
+    }
+
+    function updateMicButtonsState() {
+      const globalBtn = document.getElementById('btn-global-mic');
+      if (globalBtn) {
+        globalBtn.classList.toggle('listening', isListeningMic);
+        globalBtn.textContent = isListeningMic ? '🛑 Escuchando...' : '🎤 Hablar con NPC';
+      }
+      const inspMicBtn = document.getElementById('btn-insp-mic');
+      if (inspMicBtn) {
+        inspMicBtn.classList.toggle('listening', isListeningMic);
+        inspMicBtn.textContent = isListeningMic ? '🛑 Escuchando...' : '🎤 Hablar';
+      }
+    }
+
+    function getClosestNpcIdToCamera() {
+      let bestId = activeDialogueNpcId || activeNpcForVoice || 'npc-ruben';
+      let minDist = Infinity;
+      const camPos = new THREE.Vector3();
+      camera.getWorldPosition(camPos);
+      npcActors.forEach((actor) => {
+        const d = actor.root.position.distanceTo(camPos);
+        if (d < minDist) {
+          minDist = d;
+          bestId = actor.data.id;
+        }
+      });
+      return bestId;
+    }
+
+    function toggleMicrophoneInput(targetNpcId = null) {
+      if (targetNpcId) {
+        activeNpcForVoice = targetNpcId;
+      } else if (activeDialogueNpcId) {
+        activeNpcForVoice = activeDialogueNpcId;
+      } else if (cameraMode === 'walk' || renderer.xr.isPresenting) {
+        activeNpcForVoice = getClosestNpcIdToCamera();
+      }
+
+      const actor = npcObjectsMap.get(activeNpcForVoice);
+      if (actor) {
+        activeDialogueNpcId = activeNpcForVoice;
+        actor.talkingToPlayer = true;
+      }
+
+      if (!recognition) {
+        openNpcDialogue(activeNpcForVoice, true);
+        showToast('Tu navegador no soporta voz directa: Escribe cualquier pregunta en la caja de texto del NPC a la derecha.');
+        return;
+      }
+      if (isListeningMic) {
+        recognition.stop();
+      } else {
+        try {
+          recognition.start();
+        } catch (e) {
+          recognition.stop();
+        }
+      }
+    }
+
+    document.getElementById('btn-global-mic').addEventListener('click', () => {
+      toggleMicrophoneInput(null);
+    });
+
+    function buildNpcLiveActivityDescription(actor) {
+      const npc = actor.data;
+      if (actor.repairTargetStation && simState.brokenStationId === actor.repairTargetStation.id) {
+        if (simState.repairPhase === 'walking_to_machine') {
+          return `acudiendo de emergencia hacia la estación ${actor.repairTargetStation.id} (${actor.repairTargetStation.name}) porque acaba de sufrir una avería`;
+        }
+        const pct = Math.round(simState.repairProgress * 100);
+        return `reparando físicamente la estación ${actor.repairTargetStation.id} (${actor.repairTargetStation.name}) con mi llave mecánica (llevo un ${pct}% de avance)`;
+      }
+      if (!simState.running) {
+        return `en nuestra pausa operativa y charla de equipo en el pasillo central con mis compañeros mientras todas las máquinas están detenidas`;
+      }
+      const wp = npc.waypoints[actor.wpIndex];
+      if (actor.state === 'walking') {
+        return `caminando por el pasillo de seguridad hacia mi puesto en ${wp.label.split(':')[1] || wp.label}`;
+      }
+      return `trabajando en ${wp.label}`;
+    }
+
+    function generateSelfAwareNpcReply(userText, actor) {
+      const npc = actor.data;
+      const q = userText.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+      const liveActivity = buildNpcLiveActivityDescription(actor);
+      const bph = (!simState.running || simState.brokenStationId) ? 0 : Math.round(24000 * simState.speedMultiplier);
+
+      actor.conversationCount = (actor.conversationCount || 0) + 1;
+
+      if (
+        q.includes('como te llamas') ||
+        q.includes('cual es tu nombre') ||
+        q.includes('tu nombre') ||
+        q.includes('quien eres') ||
+        q.includes('como se llama') ||
+        q.includes('presentate') ||
+        q.includes('identificate')
+      ) {
+        if (npc.id === 'npc-ruben') {
+          return {
+            reply: `¡Mucho gusto! Aquí me quedo conversando contigo. Me llamo Rubén Maldonado, aunque varios colegas me dicen Carlos. Tengo ${npc.age} años, soy ${npc.role} y llevo ${npc.yearsExp} años cuidando el Monoblock Isobárico ST-02.`,
+            anim: 'Talk_To_Player'
+          };
+        } else if (npc.id === 'npc-lima') {
+          return {
+            reply: `¡Hola! Claro, te miro y charlamos. Me llamo Lima Gutiérrez, tengo ${npc.age} años, soy Ingeniera Química y trabajo como ${npc.role} desde hace ${npc.yearsExp} años aquí en la embotelladora.`,
+            anim: 'Talk_To_Player'
+          };
+        } else {
+          return {
+            reply: `¡Un placer saludarte cara a cara! Mi nombre es Javier López. Tengo ${npc.age} años, llevo ${npc.yearsExp} años en la industria cervecera y soy el ${npc.role}, encargado del sistema CIP y de los extremos de la línea.`,
+            anim: 'Talk_To_Player'
+          };
+        }
+      }
+
+      if (
+        q.includes('conciencia') ||
+        q.includes('consciente') ||
+        q.includes('eres real') ||
+        q.includes('eres un npc') ||
+        q.includes('eres una ia') ||
+        q.includes('inteligencia artificial') ||
+        q.includes('estas vivo') ||
+        q.includes('sientes') ||
+        q.includes('piensas')
+      ) {
+        return {
+          reply: `¡Claro que tengo conciencia de quién soy y de que estás frente a mí conversando! Soy ${npc.name}, sé que ahora mismo estoy ${liveActivity}, que llevamos ${simState.bottlesOk} botellas producidas y no me iré hasta que terminemos de hablar.`,
+          anim: 'Talk_To_Player'
+        };
+      }
+
+      if (
+        q.includes('cuantos anos') ||
+        q.includes('que edad') ||
+        q.includes('tu edad') ||
+        q.includes('de donde eres') ||
+        q.includes('donde naciste') ||
+        q.includes('cuanto tiempo llevas') ||
+        q.includes('experiencia') ||
+        q.includes('que te gusta') ||
+        q.includes('hobby') ||
+        q.includes('tiempo libre') ||
+        q.includes('hablame de ti') ||
+        q.includes('cuentame de ti')
+      ) {
+        return {
+          reply: `Soy ${npc.name}, nací en ${npc.hometown}, tengo ${npc.age} años y llevo ${npc.yearsExp} años trabajando en esta embotelladora. ${npc.personality} Además, fuera del trabajo ${npc.hobby.charAt(0).toLowerCase() + npc.hobby.slice(1)}`,
+          anim: 'Talk_To_Player'
+        };
+      }
+
+      if (
+        q.includes('como estas') ||
+        q.includes('que tal estas') ||
+        q.includes('como te sientes') ||
+        q.includes('como va todo') ||
+        q.includes('estas cansad') ||
+        q === 'hola' ||
+        q === 'buenos dias' ||
+        q === 'buenas tardes' ||
+        q === 'buenas' ||
+        (q.startsWith('hola ') && q.length < 18)
+      ) {
+        const statusMood = simState.brokenStationId
+          ? `atento porque tenemos una alarma en la estación ${simState.brokenStationId}, pero ya nos estamos encargando.`
+          : (!simState.running
+            ? `muy relajado aprovechando que paraste las máquinas para tomar un café y conversar con mis compañeros Rubén, Lima y Javier.`
+            : `con excelente energía hoy; la línea va a ${simState.speedMultiplier.toFixed(1)}x (${bph.toLocaleString()} botellas por hora).`);
+        return {
+          reply: `¡Hola! Soy ${npc.name}. Aquí me detengo a mirarte para que platiquemos a gusto. Estoy ${statusMood} ¿Qué te gustaría saber?`,
+          anim: 'Talk_To_Player'
+        };
+      }
+
+      if (
+        q.includes('que estas haciendo') ||
+        q.includes('que haces') ||
+        q.includes('a donde vas') ||
+        q.includes('donde estas') ||
+        q.includes('en que trabajas') ||
+        q.includes('cual es tu trabajo') ||
+        q.includes('tu puesto') ||
+        q.includes('tu rol')
+      ) {
+        return {
+          reply: `Soy ${npc.name} (${npc.role}). Ahora mismo me detuve a conversar contigo cara a cara, y justo antes estaba ${liveActivity}. Mis estaciones son ${npc.stations}.`,
+          anim: 'Talk_To_Player'
+        };
+      }
+
+      if (
+        q.includes('companer') ||
+        q.includes('colega') ||
+        q.includes('equipo de trabajo') ||
+        q.includes('quien mas trabaja') ||
+        (q.includes('quien es') && (q.includes('lima') || q.includes('ruben') || q.includes('javier') || q.includes('carlos')))
+      ) {
+        return {
+          reply: `Aquí trabajamos tres especialistas: Rubén Maldonado (en el Monoblock ST-02), Lima Gutiérrez (en Calidad y Pasteurización ST-03 a ST-06) y Javier López (en Sanitización CIP y Logística ST-01, ST-07 y ST-08). Cuando paras las máquinas nos reunimos aquí en el pasillo central a tomar café y charlar. ${npc.colleaguesOpinion}`,
+          anim: 'Talk_To_Player'
+        };
+      }
+
+      if (q.includes('arregl') || q.includes('repar') || q.includes('averi') || q.includes('dano') || q.includes('falla') || q.includes('rompi')) {
+        if (actor.lastRepairSpeech) {
+          return {
+            reply: `Te cuento cómo lo solucioné yo mismo (${npc.name}): ${actor.lastRepairSpeech}`,
+            anim: 'Talk_To_Player'
+          };
+        } else if (simState.brokenStationId) {
+          const st = STATIONS_DATA.find(s => s.id === simState.brokenStationId);
+          return {
+            reply: st
+              ? `Justo ahora tenemos una avería en ${st.id} (${st.name}) por ${st.failureReason.toLowerCase()} ${st.repairExplanation}`
+              : `Estamos atendiendo una falla en la línea en este momento.`,
+            anim: 'Fix_Bottle_Jam'
+          };
+        } else {
+          const myStations = STATIONS_DATA.filter(s => s.responsibleNpc === npc.id);
+          const sample = myStations[0] || STATIONS_DATA[1];
+          return {
+            reply: `Ahora mismo las 8 estaciones de la línea están operativas y sin fallas. Cuando ocurre una avería en mi zona (como en ${sample.id}), camino de inmediato con mi llave mecánica, desbloqueo el mecanismo y recalibro los sensores.`,
+            anim: 'Talk_To_Player'
+          };
+        }
+      }
+
+      if (
+        q.includes('cuantas botellas') ||
+        q.includes('produccion') ||
+        q.includes('velocidad') ||
+        q.includes('como va la planta') ||
+        q.includes('estado de la planta') ||
+        q.includes('que hora es')
+      ) {
+        const nowStr = new Date().toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' });
+        return {
+          reply: `Son las ${nowStr}. En lo que va de turno llevamos ${simState.bottlesOk} botellas conformes y solo ${simState.bottlesRejected} descartadas por la inspectora FBI. La línea está ${simState.running ? 'en marcha' : 'detenida en pausa social'} a velocidad ${simState.speedMultiplier.toFixed(1)}x (${bph.toLocaleString()} BPH).`,
+          anim: 'Talk_To_Player'
+        };
+      }
+
+      if (q.includes('co2') || q.includes('carbonata') || q.includes('presion') || q.includes('espuma') || q.includes('jetting') || q.includes('isobaric')) {
+        return {
+          reply: `Como te comentaba, soy ${npc.name}: en el llenado isobárico (ST-02) y el saturador (ST-SAT) mantenemos entre 7 y 8 gramos por litro de CO2 a contrapresión. Si falla la presión de CO2, la cerveza haría espuma excesiva; y antes de coronar inyectamos el jetting de agua caliente para desalojar todo el oxígeno del cuello.`,
+          anim: 'Talk_To_Player'
+        };
+      }
+      if (q.includes('tunel') || q.includes('pasteuriza') || q.includes('temperatura') || q.includes('60') || q.includes('62') || q.includes('lluvia')) {
+        return {
+          reply: `El Túnel de Pasteurización ST-03 aplica lluvia de agua caliente a 60–62°C durante 20 minutos sobre las botellas ya cerradas. Así eliminamos levaduras residuales y garantizamos 12 meses de estabilidad comercial antes de enfriarlas a temperatura ambiente.`,
+          anim: 'Talk_To_Player'
+        };
+      }
+      if (q.includes('fbi') || q.includes('inspectora') || q.includes('mal llena') || q.includes('sin tapa') || q.includes('rechaz') || q.includes('vision') || q.includes('etiqueta')) {
+        return {
+          reply: `En control de calidad tenemos la inspectora FBI ST-04 (que verifica nivel de llenado y chapa corona con alta frecuencia y expulsa botellas malas con un pistón neumático), la Etiquetadora láser ST-05 y la Visión 360° ST-06.`,
+          anim: 'Talk_To_Player'
+        };
+      }
+      if (q.includes('cip') || q.includes('tanque') || q.includes('sosa') || q.includes('caustica') || q.includes('acido') || q.includes('limpieza') || q.includes('sanitiza')) {
+        return {
+          reply: `El skid tri-tanque ST-CIP bombea sosa cáustica a 80°C y ácido peracético por las tuberías de acero inoxidable AISI 316L hacia el Monoblock ST-02 para dejar todo microbiológicamente estéril sin desmontar las máquinas.`,
+          anim: 'Talk_To_Player'
+        };
+      }
+      if (q.includes('robot') || q.includes('paletiza') || q.includes('despaletiza') || q.includes('caja') || q.includes('encartonadora') || q.includes('st-01') || q.includes('st-07') || q.includes('st-08')) {
+        return {
+          reply: `En la entrada ST-01 el despaletizador PHS300 retira los cartones con ventosas; en la ST-07 agrupamos matrices de 4 por 6 (24 botellas por caja); y al final en la ST-08 el robot articulado de 6 ejes apila las cajas sobre el Europallet.`,
+          anim: 'Talk_To_Player'
+        };
+      }
+      if (q.includes('funcion cumple') || q.includes('que hace esta maquina') || q.includes('explicame')) {
+        return {
+          reply: npc.dialogue.initialResponse,
+          anim: 'Talk_To_Player'
+        };
+      }
+
+      if (q.includes('gracias') || q.includes('excelente') || q.includes('muy bien') || q.includes('genial')) {
+        return {
+          reply: `¡Con mucho gusto! Recuerda que soy ${npc.name} y me quedaré aquí mirándote por si quieres hacerme otra pregunta. Cuando quieras que vuelva a mi ronda, solo cierra el panel o dime adiós.`,
+          anim: 'Talk_To_Player'
+        };
+      }
+      if (q.includes('chiste') || q.includes('broma') || q.includes('dato curioso') || q.includes('cerveza')) {
+        return {
+          reply: `¡Ja, ja! Como buen cervecero te digo nuestro lema en planta: "El oxígeno es el peor enemigo de una buena cerveza, ¡por eso aquí lo sacamos con doble vacío antes de poner la chapa corona!"`,
+          anim: 'Talk_To_Player'
+        };
+      }
+      if (q.includes('adios') || q.includes('hasta luego') || q.includes('chao') || q.includes('nos vemos') || q.includes('puedes irte') || q.includes('sigue trabajando')) {
+        setTimeout(() => releaseNpcFromConversation(npc.id), 4500);
+        return {
+          reply: `¡Hasta luego! Fue un gusto conversar contigo. Regreso a mi ronda en la planta, ¡llámame cuando me necesites!`,
+          anim: 'Forklift_Signal'
+        };
+      }
+
+      return {
+        reply: `Soy ${npc.name} (${npc.role}) y te estoy escuchando atentamente. Respecto a lo que me comentas ("${userText}"), te cuento que ahora mismo estoy ${liveActivity}, con un acumulado de ${simState.bottlesOk} botellas buenas en el turno. Pregúntame lo que quieras sobre mí, mis compañeros o las máquinas.`,
+        anim: 'Talk_To_Player'
+      };
+    }
+
+    async function fetchGeminiLiveReply(userText, actor) {
+      const npc = actor.data;
+      const liveActivity = buildNpcLiveActivityDescription(actor);
+      const bph = (!simState.running || simState.brokenStationId) ? 0 : Math.round(24000 * simState.speedMultiplier);
+      const sysPrompt = `Eres ${npc.name} (${npc.alias}), ${npc.role} en una Planta Embotelladora de Cerveza en Vidrio en 3D WebXR.
+Tienes conciencia propia, estás detenido mirando a los ojos al usuario y hablas en español en primera persona (2 a 3 oraciones máximo, tono natural para ser leído por voz TTS).
+Tus datos personales: Edad ${npc.age} años, ${npc.yearsExp} años de experiencia en la planta, originario de ${npc.hometown}. Personalidad: ${npc.personality}. Gustos: ${npc.hobby}.
+Tus compañeros de turno son Rubén Maldonado (Operador Monoblock ST-02), Lima Gutiérrez (Ingeniera de Calidad y Pasteurización ST-03 a ST-06 y ST-SAT) y Javier López (Ingeniero de Sanitización ST-CIP y Logística ST-01, ST-07, ST-08).
+Estado en tiempo real de la planta: Ahora mismo estás ${liveActivity}. Estaciones a tu cargo: ${npc.stations}. Velocidad de línea: ${simState.speedMultiplier}x (${bph} BPH). Botellas conformes: ${simState.bottlesOk}, rechazadas: ${simState.bottlesRejected}. Avería actual: ${simState.brokenStationId || 'Ninguna'}. Última reparación tuya: ${actor.lastRepairSpeech || 'Ninguna reciente'}.
+Responde directamente a lo que te pregunta el usuario ("${userText}") con total coherencia y conciencia de quién eres.`;
+
+      const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${encodeURIComponent(optionalGeminiApiKey)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: sysPrompt }] }]
+        })
+      });
+      if (!resp.ok) throw new Error('API Error');
+      const data = await resp.json();
+      const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (!text) throw new Error('Empty response');
+      return text.replace(/[*#`_]/g, '').trim();
+    }
+
+    function releaseNpcFromConversation(npcId = null) {
+      const idToRelease = npcId || activeDialogueNpcId;
+      if (idToRelease) {
+        const actor = npcObjectsMap.get(idToRelease);
+        if (actor) {
+          actor.talkingToPlayer = false;
+          actor.forcedAnimTimer = 0;
+        }
+      }
+      activeDialogueNpcId = null;
+    }
+
+    async function processUserQuestionToNpc(userText, defaultNpcId) {
+      const q = userText.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+      let targetNpcId = defaultNpcId || activeDialogueNpcId || activeNpcForVoice || 'npc-ruben';
+      if (q.includes('ruben') || q.includes('carlos')) {
+        targetNpcId = 'npc-ruben';
+      } else if (q.includes('lima') || q.includes('gutierrez')) {
+        targetNpcId = 'npc-lima';
+      } else if (q.includes('javier') || q.includes('lopez')) {
+        targetNpcId = 'npc-javier';
+      }
+
+      npcActors.forEach(a => {
+        if (a.data.id !== targetNpcId) a.talkingToPlayer = false;
+      });
+
+      const actor = npcObjectsMap.get(targetNpcId);
+      if (!actor) return;
+      activeNpcForVoice = targetNpcId;
+      activeDialogueNpcId = targetNpcId;
+      actor.talkingToPlayer = true; // Se queda parado mirándote fijamente y NO se va
+
+      const localResult = generateSelfAwareNpcReply(userText, actor);
+      let finalReply = localResult.reply;
+
+      actor.currentAnim = localResult.anim || 'Talk_To_Player';
+
+      if (optionalGeminiApiKey) {
+        try {
+          showToast(`🧠 ${actor.data.name} te mira y piensa su respuesta...`);
+          finalReply = await fetchGeminiLiveReply(userText, actor);
+        } catch (err) {
+          console.warn('Usando motor consciente local como respaldo:', err);
+        }
+      }
+
+      showNpcOverheadSpeech(actor, finalReply, 16.0);
+      openNpcDialogue(targetNpcId, false, finalReply, userText);
+    }
+
+    // =========================================================================
+    // 4. INICIALIZACIÓN DE ESCENA THREE.JS CON ILUMINACIÓN INDUSTRIAL POTENTE
+    // =========================================================================
+    const container = document.getElementById('canvas-container');
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x28384d);
+    scene.fog = new THREE.FogExp2(0x28384d, 0.0028);
+
+    const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 260);
+
+    const playerRig = new THREE.Group();
+    playerRig.position.set(-10, 0, 14);
+    scene.add(playerRig);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.48;
+    renderer.xr.enabled = true;
+    container.appendChild(renderer.domElement);
+
+    const orbitControls = new OrbitControls(camera, renderer.domElement);
+    orbitControls.enableDamping = true;
+    orbitControls.dampingFactor = 0.06;
+    orbitControls.maxPolarAngle = Math.PI / 2 - 0.02;
+    orbitControls.minDistance = 2;
+    orbitControls.maxDistance = 95;
+    camera.position.set(-4, 18, 28);
+    orbitControls.target.set(2, 2, -2);
+    orbitControls.update();
+
+    const ambientLight = new THREE.AmbientLight(0xf1f5f9, 1.55);
+    scene.add(ambientLight);
+
+    const hemiLight = new THREE.HemisphereLight(0xffffff, 0x475569, 1.25);
+    hemiLight.position.set(0, 30, 0);
+    scene.add(hemiLight);
+
+    const mainDirLight = new THREE.DirectionalLight(0xfffbeb, 2.1);
+    mainDirLight.position.set(18, 35, 24);
+    mainDirLight.castShadow = true;
+    mainDirLight.shadow.mapSize.width = 2048;
+    mainDirLight.shadow.mapSize.height = 2048;
+    mainDirLight.shadow.camera.near = 1;
+    mainDirLight.shadow.camera.far = 120;
+    const d = 55;
+    mainDirLight.shadow.camera.left = -d;
+    mainDirLight.shadow.camera.right = d;
+    mainDirLight.shadow.camera.top = d;
+    mainDirLight.shadow.camera.bottom = -d;
+    mainDirLight.shadow.bias = -0.0005;
+    scene.add(mainDirLight);
+
+    const fillDirLight = new THREE.DirectionalLight(0xe0f2fe, 1.35);
+    fillDirLight.position.set(-22, 28, -20);
+    scene.add(fillDirLight);
+
+    [-34, -16, 2, 20, 38].forEach((lx) => {
+      const ptLight = new THREE.PointLight(0xffffff, 2.2, 42, 1.2);
+      ptLight.position.set(lx, 10.5, -2);
+      scene.add(ptLight);
+    });
+
+    const MATS = {
+      steel: new THREE.MeshStandardMaterial({ color: 0xdbe4ef, metalness: 0.65, roughness: 0.25 }),
+      darkSteel: new THREE.MeshStandardMaterial({ color: 0x475569, metalness: 0.55, roughness: 0.35 }),
+      brushedSteel: new THREE.MeshStandardMaterial({ color: 0x94a3b8, metalness: 0.65, roughness: 0.3 }),
+      orangePaint: new THREE.MeshStandardMaterial({ color: 0xf97316, metalness: 0.25, roughness: 0.35 }),
+      bluePaint: new THREE.MeshStandardMaterial({ color: 0x0284c7, metalness: 0.35, roughness: 0.3 }),
+      robotRed: new THREE.MeshStandardMaterial({ color: 0xef4444, metalness: 0.4, roughness: 0.28 }),
+      safetyYellow: new THREE.MeshStandardMaterial({ color: 0xfacc15, metalness: 0.15, roughness: 0.4 }),
+      conveyorBelt: new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.2, roughness: 0.75 }),
+      acrylicGlass: new THREE.MeshPhysicalMaterial({
+        color: 0xe0f2fe,
+        transparent: true,
+        opacity: 0.34,
+        roughness: 0.1,
+        metalness: 0.05,
+        transmission: 0.5
+      }),
+      amberGlass: new THREE.MeshStandardMaterial({
+        color: 0xb45309,
+        transparent: true,
+        opacity: 0.85,
+        roughness: 0.15,
+        metalness: 0.1
+      }),
+      greenGlass: new THREE.MeshStandardMaterial({
+        color: 0x16a34a,
+        transparent: true,
+        opacity: 0.85,
+        roughness: 0.15,
+        metalness: 0.1
+      }),
+      beerLiquid: new THREE.MeshStandardMaterial({
+        color: 0xfbbf24,
+        emissive: 0x92400e,
+        emissiveIntensity: 0.3,
+        roughness: 0.2
+      }),
+      crownCap: new THREE.MeshStandardMaterial({ color: 0xfde047, metalness: 0.75, roughness: 0.2 }),
+      labelPaper: new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.45 }),
+      cardboard: new THREE.MeshStandardMaterial({ color: 0xc28e54, roughness: 0.8 }),
+      woodPallet: new THREE.MeshStandardMaterial({ color: 0x9a6b38, roughness: 0.85 }),
+      pipeSanitary: new THREE.MeshStandardMaterial({ color: 0xf1f5f9, metalness: 0.8, roughness: 0.18 }),
+      cipGlowPipe: new THREE.MeshStandardMaterial({
+        color: 0x38bdf8,
+        emissive: 0x0284c7,
+        emissiveIntensity: 0.0,
+        metalness: 0.7,
+        roughness: 0.2
+      })
+    };
+
+    const interactableMeshes = [];
+    const teleportMeshes = [];
+    const stationObjectsMap = new Map();
+    const npcObjectsMap = new Map();
+
+    // =========================================================================
+    // 5. CONSTRUCCIÓN DE LA NAVE INDUSTRIAL CON LAS 4 PAREDES + ZONA DE ENCUENTRO
+    // =========================================================================
+    function buildIndustrialHall() {
+      const hallGroup = new THREE.Group();
+
+      const floorGeo = new THREE.PlaneGeometry(116, 48);
+      const floorMat = new THREE.MeshStandardMaterial({
+        color: 0x334155,
+        roughness: 0.65,
+        metalness: 0.12
+      });
+      const floorMesh = new THREE.Mesh(floorGeo, floorMat);
+      floorMesh.rotation.x = -Math.PI / 2;
+      floorMesh.receiveShadow = true;
+      floorMesh.userData = { isFloor: true };
+      hallGroup.add(floorMesh);
+      teleportMeshes.push(floorMesh);
+
+      const gridHelper = new THREE.GridHelper(116, 58, 0x64748b, 0x475569);
+      gridHelper.position.y = 0.01;
+      hallGroup.add(gridHelper);
+
+      // Círculo de Punto de Encuentro / Pausa Activa en el pasillo central
+      const meetRing = new THREE.Mesh(
+        new THREE.RingGeometry(1.75, 1.95, 36),
+        new THREE.MeshBasicMaterial({ color: 0x38bdf8, side: THREE.DoubleSide })
+      );
+      meetRing.rotation.x = -Math.PI / 2;
+      meetRing.position.set(BREAK_MEETING_CENTER.x, 0.025, BREAK_MEETING_CENTER.z);
+      hallGroup.add(meetRing);
+
+      const wallPanelMat = new THREE.MeshStandardMaterial({
+        color: 0x94a3b8,
+        roughness: 0.55,
+        metalness: 0.2
+      });
+      const wallDadoMat = new THREE.MeshStandardMaterial({
+        color: 0x1e3a8a,
+        roughness: 0.5,
+        metalness: 0.15
+      });
+      const windowMat = new THREE.MeshBasicMaterial({
+        color: 0xe0f2fe,
+        transparent: true,
+        opacity: 0.65
+      });
+
+      function createDetailedWall(width, height, x, z, rotY) {
+        const wGroup = new THREE.Group();
+        wGroup.position.set(x, 0, z);
+        wGroup.rotation.y = rotY;
+
+        const mainWall = new THREE.Mesh(new THREE.BoxGeometry(width, height, 0.4), wallPanelMat);
+        mainWall.position.y = height / 2;
+        mainWall.receiveShadow = true;
+        wGroup.add(mainWall);
+
+        const dado = new THREE.Mesh(new THREE.BoxGeometry(width, 2.2, 0.44), wallDadoMat);
+        dado.position.y = 1.1;
+        wGroup.add(dado);
+
+        const stripe = new THREE.Mesh(new THREE.BoxGeometry(width, 0.22, 0.46), MATS.safetyYellow);
+        stripe.position.y = 2.25;
+        wGroup.add(stripe);
+
+        const winBand = new THREE.Mesh(new THREE.BoxGeometry(width - 4, 1.8, 0.45), windowMat);
+        winBand.position.y = 9.4;
+        wGroup.add(winBand);
+
+        hallGroup.add(wGroup);
+      }
+
+      createDetailedWall(116, 12, 4, -24.0, 0);
+      createDetailedWall(116, 12, 4, 24.0, Math.PI);
+      createDetailedWall(48, 12, -54.0, 0, Math.PI / 2);
+      createDetailedWall(48, 12, 62.0, 0, -Math.PI / 2);
+
+      function createSafetyStripe(x, z, w, d) {
+        const geo = new THREE.PlaneGeometry(w, d);
+        const mat = new THREE.MeshBasicMaterial({ color: 0xfacc15, side: THREE.DoubleSide });
+        const m = new THREE.Mesh(geo, mat);
+        m.rotation.x = -Math.PI / 2;
+        m.position.set(x, 0.02, z);
+        hallGroup.add(m);
+      }
+      createSafetyStripe(4, -7.8, 88, 0.16);
+      createSafetyStripe(4, -0.2, 88, 0.16);
+      createSafetyStripe(-19.5, 4.5, 22, 0.16);
+      createSafetyStripe(-19.5, 12.5, 22, 0.16);
+      createSafetyStripe(-30.5, 8.5, 0.16, 8.0);
+      createSafetyStripe(-8.5, 8.5, 0.16, 8.0);
+
+      const colGeo = new THREE.BoxGeometry(0.65, 12, 0.65);
+      const beamGeo = new THREE.BoxGeometry(0.45, 0.55, 48);
+      for (let x = -48; x <= 52; x += 12.5) {
+        const colNorth = new THREE.Mesh(colGeo, MATS.darkSteel);
+        colNorth.position.set(x, 6, -23.5);
+        hallGroup.add(colNorth);
+
+        const colSouth = new THREE.Mesh(colGeo, MATS.darkSteel);
+        colSouth.position.set(x, 6, 23.5);
+        hallGroup.add(colSouth);
+
+        const roofBeam = new THREE.Mesh(beamGeo, MATS.darkSteel);
+        roofBeam.position.set(x, 11.8, 0);
+        hallGroup.add(roofBeam);
+
+        for (let z = -12; z <= 12; z += 12) {
+          const lampHousing = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.22, 0.75), MATS.steel);
+          lampHousing.position.set(x, 11.45, z);
+          const lampGlow = new THREE.Mesh(
+            new THREE.PlaneGeometry(2.4, 0.65),
+            new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide })
+          );
+          lampGlow.rotation.x = Math.PI / 2;
+          lampGlow.position.set(x, 11.32, z);
+          hallGroup.add(lampHousing, lampGlow);
+        }
+      }
+
+      STATIONS_DATA.forEach((st) => {
+        const padGroup = new THREE.Group();
+        const padZ = st.category === 'skid' ? st.pos.z - 3.6 : st.pos.z + 3.6;
+        padGroup.position.set(st.pos.x, 0.03, padZ);
+
+        const ringGeo = new THREE.RingGeometry(0.55, 0.72, 32);
+        const ringMat = new THREE.MeshBasicMaterial({
+          color: st.category === 'skid' ? 0x10b981 : 0xf59e0b,
+          side: THREE.DoubleSide
+        });
+        const ring = new THREE.Mesh(ringGeo, ringMat);
+        ring.rotation.x = -Math.PI / 2;
+        padGroup.add(ring);
+
+        const discGeo = new THREE.CircleGeometry(0.55, 32);
+        const discMat = new THREE.MeshBasicMaterial({
+          color: 0x0ea5e9,
+          transparent: true,
+          opacity: 0.25,
+          side: THREE.DoubleSide
+        });
+        const disc = new THREE.Mesh(discGeo, discMat);
+        disc.rotation.x = -Math.PI / 2;
+        disc.userData = {
+          isFloor: true,
+          isStationPad: true,
+          stationId: st.id
+        };
+        padGroup.add(disc);
+        teleportMeshes.push(disc);
+
+        hallGroup.add(padGroup);
+      });
+
+      scene.add(hallGroup);
+    }
+
+    // =========================================================================
+    // 6. CINTAS TRANSPORTADORAS CON MARCAS MÓVILES Y TUBERÍAS SANITARIAS AISI 316L
+    // =========================================================================
+    const conveyorSlats = [];
+
+    function buildConveyorsAndPiping() {
+      const group = new THREE.Group();
+
+      const convLength = 74;
+      const centerX = 3.5;
+      const railGeo = new THREE.BoxGeometry(convLength, 0.18, 0.9);
+      const rail = new THREE.Mesh(railGeo, MATS.steel);
+      rail.position.set(centerX, 1.05, -4);
+      rail.castShadow = true;
+      rail.receiveShadow = true;
+      group.add(rail);
+
+      const beltGeo = new THREE.BoxGeometry(convLength, 0.06, 0.56);
+      const belt = new THREE.Mesh(beltGeo, MATS.conveyorBelt);
+      belt.position.set(centerX, 1.16, -4);
+      group.add(belt);
+
+      const slatGeo = new THREE.BoxGeometry(0.08, 0.015, 0.52);
+      const slatMat = new THREE.MeshBasicMaterial({ color: 0xfacc15 });
+      for (let i = 0; i < 60; i++) {
+        const slat = new THREE.Mesh(slatGeo, slatMat);
+        slat.position.set(-33.0 + (i / 60) * convLength, 1.195, -4);
+        group.add(slat);
+        conveyorSlats.push({ mesh: slat, progress: i / 60 });
+      }
+
+      const guideGeo = new THREE.BoxGeometry(convLength, 0.08, 0.04);
+      const guideFront = new THREE.Mesh(guideGeo, MATS.brushedSteel);
+      guideFront.position.set(centerX, 1.28, -3.68);
+      const guideBack = new THREE.Mesh(guideGeo, MATS.brushedSteel);
+      guideBack.position.set(centerX, 1.28, -4.32);
+      group.add(guideFront, guideBack);
+
+      const legGeo = new THREE.CylinderGeometry(0.06, 0.06, 1.05, 12);
+      for (let x = -33; x <= 40; x += 2.5) {
+        const leg1 = new THREE.Mesh(legGeo, MATS.darkSteel);
+        leg1.position.set(x, 0.525, -3.65);
+        const leg2 = new THREE.Mesh(legGeo, MATS.darkSteel);
+        leg2.position.set(x, 0.525, -4.35);
+        group.add(leg1, leg2);
+      }
+
+      function createPipeSegment(p1, p2, radius = 0.09, mat = MATS.pipeSanitary) {
+        const dir = new THREE.Vector3().subVectors(p2, p1);
+        const len = dir.length();
+        const cylGeo = new THREE.CylinderGeometry(radius, radius, len, 16);
+        const mesh = new THREE.Mesh(cylGeo, mat);
+        mesh.position.copy(p1).add(p2).multiplyScalar(0.5);
+        mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.clone().normalize());
+        group.add(mesh);
+
+        const joint = new THREE.Mesh(new THREE.SphereGeometry(radius * 1.25, 12, 12), mat);
+        joint.position.copy(p2);
+        group.add(joint);
+      }
+
+      const cipPts = [
+        new THREE.Vector3(-25, 2.5, 7.5),
+        new THREE.Vector3(-25, 4.6, 7.5),
+        new THREE.Vector3(-25, 4.6, -2.2),
+        new THREE.Vector3(-20.8, 4.6, -2.2),
+        new THREE.Vector3(-20.8, 3.1, -3.2)
+      ];
+      for (let i = 0; i < cipPts.length - 1; i++) {
+        createPipeSegment(cipPts[i], cipPts[i + 1], 0.1, MATS.cipGlowPipe);
+      }
+
+      const satPts = [
+        new THREE.Vector3(-14, 2.4, 7.5),
+        new THREE.Vector3(-14, 4.3, 7.5),
+        new THREE.Vector3(-14, 4.3, -2.5),
+        new THREE.Vector3(-19.2, 4.3, -2.5),
+        new THREE.Vector3(-19.2, 3.1, -3.2)
+      ];
+      for (let i = 0; i < satPts.length - 1; i++) {
+        createPipeSegment(satPts[i], satPts[i + 1], 0.09, MATS.pipeSanitary);
+      }
+
+      scene.add(group);
+    }
+
+    // =========================================================================
+    // 7. MODELADO PROCEDURAL DE LAS 10 ESTACIONES + BALIZA Y CHISPAS DE REPARACIÓN
+    // =========================================================================
+    const animatedParts = {
+      depalletizerGantry: null,
+      rinserCarousel: null,
+      fillerCarousel: null,
+      capperCarousel: null,
+      fbiPiston: null,
+      fbiLight: null,
+      labelerCarousel: null,
+      laserBeam: null,
+      dropPackerHead: null,
+      robotBase: null,
+      robotShoulder: null,
+      robotArm: null,
+      robotWrist: null,
+      robotBox: null
+    };
+
+    const breakdownBeaconGroup = new THREE.Group();
+    breakdownBeaconGroup.visible = false;
+    const sirenCone = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.35, 0.5, 0.7, 16),
+      new THREE.MeshBasicMaterial({ color: 0xef4444 })
+    );
+    const sirenRing = new THREE.Mesh(
+      new THREE.TorusGeometry(1.1, 0.08, 12, 32),
+      new THREE.MeshBasicMaterial({ color: 0xfef08a })
+    );
+    sirenRing.rotation.x = Math.PI / 2;
+    const sirenPointLight = new THREE.PointLight(0xef4444, 5, 16);
+    sirenPointLight.position.set(0, 0.5, 0);
+    breakdownBeaconGroup.add(sirenCone, sirenRing, sirenPointLight);
+    scene.add(breakdownBeaconGroup);
+
+    const repairSparksGroup = new THREE.Group();
+    repairSparksGroup.visible = false;
+    const sparkMeshes = [];
+    for (let i = 0; i < 10; i++) {
+      const sp = new THREE.Mesh(
+        new THREE.OctahedronGeometry(0.06, 0),
+        new THREE.MeshBasicMaterial({ color: i % 2 === 0 ? 0xfef08a : 0x38bdf8 })
+      );
+      repairSparksGroup.add(sp);
+      sparkMeshes.push({ mesh: sp, angle: (i / 10) * Math.PI * 2, speed: 2.5 + (i % 3) });
+    }
+    scene.add(repairSparksGroup);
+
+    function registerStationInteractable(group, stationData) {
+      group.traverse((child) => {
+        if (child.isMesh) {
+          child.userData.stationId = stationData.id;
+          interactableMeshes.push(child);
+        }
+      });
+      stationObjectsMap.set(stationData.id, { group, data: stationData });
+    }
+
+    function buildAllStations() {
+      const st01Data = STATIONS_DATA.find(s => s.id === 'ST-01');
+      const st01 = new THREE.Group();
+      st01.position.copy(st01Data.pos);
+
+      const postGeo = new THREE.BoxGeometry(0.28, 4.4, 0.28);
+      [[-2.2, -1.6], [2.2, -1.6], [-2.2, 1.6], [2.2, 1.6]].forEach(([px, pz]) => {
+        const post = new THREE.Mesh(postGeo, MATS.orangePaint);
+        post.position.set(px, 2.2, pz);
+        post.castShadow = true;
+        st01.add(post);
+      });
+      const topHeader = new THREE.Mesh(new THREE.BoxGeometry(4.8, 0.65, 3.5), MATS.orangePaint);
+      topHeader.position.set(0, 4.2, 0);
+      st01.add(topHeader);
+
+      const palletBase = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.2, 1.6), MATS.woodPallet);
+      palletBase.position.set(-0.5, 0.3, 0);
+      st01.add(palletBase);
+      for (let layer = 0; layer < 4; layer++) {
+        const sep = new THREE.Mesh(new THREE.BoxGeometry(1.75, 0.04, 1.55), MATS.cardboard);
+        sep.position.set(-0.5, 0.42 + layer * 0.48, 0);
+        st01.add(sep);
+        const bottleBlock = new THREE.Mesh(new THREE.BoxGeometry(1.65, 0.42, 1.45), MATS.amberGlass);
+        bottleBlock.position.set(-0.5, 0.65 + layer * 0.48, 0);
+        st01.add(bottleBlock);
+      }
+
+      const gantry = new THREE.Group();
+      gantry.position.set(-0.5, 3.3, 0);
+      const frame = new THREE.Mesh(new THREE.BoxGeometry(1.7, 0.14, 1.5), MATS.steel);
+      gantry.add(frame);
+      for (let sx = -0.6; sx <= 0.6; sx += 0.6) {
+        for (let sz = -0.5; sz <= 0.5; sz += 0.5) {
+          const cup = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.12, 0.15, 12), MATS.safetyYellow);
+          cup.position.set(sx, -0.14, sz);
+          gantry.add(cup);
+        }
+      }
+      st01.add(gantry);
+      animatedParts.depalletizerGantry = gantry;
+
+      const fence = new THREE.Mesh(
+        new THREE.BoxGeometry(4.4, 2.2, 0.05),
+        new THREE.MeshStandardMaterial({ color: 0x1e293b, wireframe: true })
+      );
+      fence.position.set(0, 1.1, 1.65);
+      st01.add(fence);
+
+      scene.add(st01);
+      registerStationInteractable(st01, st01Data);
+
+      const st02Data = STATIONS_DATA.find(s => s.id === 'ST-02');
+      const st02 = new THREE.Group();
+      st02.position.copy(st02Data.pos);
+
+      const mbBase = new THREE.Mesh(new THREE.BoxGeometry(6.6, 1.1, 3.6), MATS.steel);
+      mbBase.position.set(0, 0.55, 0);
+      mbBase.castShadow = true;
+      st02.add(mbBase);
+
+      const mbRoof = new THREE.Mesh(new THREE.BoxGeometry(6.6, 0.35, 3.6), MATS.steel);
+      mbRoof.position.set(0, 3.55, 0);
+      st02.add(mbRoof);
+
+      const frontGlass = new THREE.Mesh(new THREE.BoxGeometry(6.4, 2.3, 0.08), MATS.acrylicGlass);
+      frontGlass.position.set(0, 2.25, 1.75);
+      const backGlass = new THREE.Mesh(new THREE.BoxGeometry(6.4, 2.3, 0.08), MATS.acrylicGlass);
+      backGlass.position.set(0, 2.25, -1.75);
+      st02.add(frontGlass, backGlass);
+
+      const rinserGroup = new THREE.Group();
+      rinserGroup.position.set(-2.0, 1.8, 0);
+      const rinserTurret = new THREE.Mesh(new THREE.CylinderGeometry(0.85, 0.85, 1.1, 20), MATS.steel);
+      rinserGroup.add(rinserTurret);
+      for (let a = 0; a < 8; a++) {
+        const ang = (a / 8) * Math.PI * 2;
+        const nozzle = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.5, 8), MATS.bluePaint);
+        nozzle.position.set(Math.cos(ang) * 0.92, -0.2, Math.sin(ang) * 0.92);
+        rinserGroup.add(nozzle);
+      }
+      st02.add(rinserGroup);
+      animatedParts.rinserCarousel = rinserGroup;
+
+      const fillerGroup = new THREE.Group();
+      fillerGroup.position.set(0, 2.0, 0);
+      const fillerTank = new THREE.Mesh(new THREE.CylinderGeometry(1.25, 1.25, 1.4, 28), MATS.pipeSanitary);
+      fillerGroup.add(fillerTank);
+      for (let a = 0; a < 12; a++) {
+        const ang = (a / 12) * Math.PI * 2;
+        const valve = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.04, 0.65, 10), MATS.darkSteel);
+        valve.position.set(Math.cos(ang) * 1.3, -0.35, Math.sin(ang) * 1.3);
+        fillerGroup.add(valve);
+      }
+      st02.add(fillerGroup);
+      animatedParts.fillerCarousel = fillerGroup;
+
+      const capperGroup = new THREE.Group();
+      capperGroup.position.set(2.1, 1.8, 0);
+      const capperTurret = new THREE.Mesh(new THREE.CylinderGeometry(0.65, 0.65, 1.2, 18), MATS.steel);
+      capperGroup.add(capperTurret);
+      for (let a = 0; a < 6; a++) {
+        const ang = (a / 6) * Math.PI * 2;
+        const head = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.45, 10), MATS.crownCap);
+        head.position.set(Math.cos(ang) * 0.7, -0.25, Math.sin(ang) * 0.7);
+        capperGroup.add(head);
+      }
+      st02.add(capperGroup);
+      animatedParts.capperCarousel = capperGroup;
+
+      const hopper = new THREE.Mesh(new THREE.ConeGeometry(0.55, 0.8, 16), MATS.safetyYellow);
+      hopper.rotation.x = Math.PI;
+      hopper.position.set(2.1, 3.95, 0.4);
+      st02.add(hopper);
+
+      const hmiStand = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 1.45, 12), MATS.darkSteel);
+      hmiStand.position.set(-1.2, 0.72, 2.25);
+      const hmiBox = new THREE.Mesh(new THREE.BoxGeometry(0.75, 0.55, 0.18), MATS.steel);
+      hmiBox.position.set(-1.2, 1.5, 2.25);
+      hmiBox.rotation.x = -0.3;
+      const hmiScreen = new THREE.Mesh(
+        new THREE.PlaneGeometry(0.58, 0.36),
+        new THREE.MeshBasicMaterial({ color: 0x0284c7 })
+      );
+      hmiScreen.position.set(-1.2, 1.53, 2.35);
+      hmiScreen.rotation.x = -0.3;
+      const eStopBtn = new THREE.Mesh(new THREE.SphereGeometry(0.06, 12, 12), MATS.robotRed);
+      eStopBtn.position.set(-0.95, 1.38, 2.36);
+      st02.add(hmiStand, hmiBox, hmiScreen, eStopBtn);
+
+      scene.add(st02);
+      registerStationInteractable(st02, st02Data);
+
+      const st03Data = STATIONS_DATA.find(s => s.id === 'ST-03');
+      const st03 = new THREE.Group();
+      st03.position.copy(st03Data.pos);
+
+      const tunnelBody = new THREE.Mesh(new THREE.BoxGeometry(12.6, 2.8, 3.4), MATS.steel);
+      tunnelBody.position.set(0, 1.8, 0);
+      tunnelBody.castShadow = true;
+      st03.add(tunnelBody);
+
+      const zoneColors = [0x38bdf8, 0xfbbf24, 0xef4444, 0xf97316, 0x10b981];
+      for (let zIdx = 0; zIdx < 5; zIdx++) {
+        const zx = -4.8 + zIdx * 2.4;
+        const win = new THREE.Mesh(
+          new THREE.PlaneGeometry(1.6, 0.9),
+          new THREE.MeshBasicMaterial({ color: zoneColors[zIdx], transparent: true, opacity: 0.55 })
+        );
+        win.position.set(zx, 2.1, 1.72);
+        st03.add(win);
+
+        const pump = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.24, 0.65, 16), MATS.bluePaint);
+        pump.rotation.z = Math.PI / 2;
+        pump.position.set(zx, 0.45, 1.95);
+        st03.add(pump);
+
+        const headerPipe = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 3.2, 12), MATS.pipeSanitary);
+        headerPipe.rotation.x = Math.PI / 2;
+        headerPipe.position.set(zx, 3.4, 0);
+        st03.add(headerPipe);
+      }
+
+      scene.add(st03);
+      registerStationInteractable(st03, st03Data);
+
+      const st04Data = STATIONS_DATA.find(s => s.id === 'ST-04');
+      const st04 = new THREE.Group();
+      st04.position.copy(st04Data.pos);
+
+      const bridgeArch = new THREE.Mesh(new THREE.BoxGeometry(1.6, 1.6, 1.5), MATS.steel);
+      bridgeArch.position.set(0, 1.9, 0);
+      st04.add(bridgeArch);
+
+      const fbiScreen = new THREE.Mesh(
+        new THREE.PlaneGeometry(0.75, 0.55),
+        new THREE.MeshBasicMaterial({ color: 0x10b981 })
+      );
+      fbiScreen.position.set(-0.2, 2.05, 0.77);
+      st04.add(fbiScreen);
+
+      const beacon = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.09, 0.09, 0.28, 12),
+        new THREE.MeshStandardMaterial({ color: 0x10b981, emissive: 0x10b981, emissiveIntensity: 0.8 })
+      );
+      beacon.position.set(0, 2.84, 0);
+      st04.add(beacon);
+      animatedParts.fbiLight = beacon;
+
+      const pistonHousing = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.25, 0.45), MATS.darkSteel);
+      pistonHousing.position.set(0.35, 1.35, -0.55);
+      st04.add(pistonHousing);
+
+      const pistonRod = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.5, 12), MATS.safetyYellow);
+      pistonRod.rotation.x = Math.PI / 2;
+      pistonRod.position.set(0.35, 1.35, -0.25);
+      st04.add(pistonRod);
+      animatedParts.fbiPiston = pistonRod;
+
+      const rejectTray = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.12, 1.2), MATS.brushedSteel);
+      rejectTray.position.set(0.35, 1.05, 0.95);
+      rejectTray.rotation.x = 0.2;
+      st04.add(rejectTray);
+
+      scene.add(st04);
+      registerStationInteractable(st04, st04Data);
+
+      const st05Data = STATIONS_DATA.find(s => s.id === 'ST-05');
+      const st05 = new THREE.Group();
+      st05.position.copy(st05Data.pos);
+
+      const labBase = new THREE.Mesh(new THREE.CylinderGeometry(1.35, 1.45, 1.1, 24), MATS.steel);
+      labBase.position.set(0, 0.55, 0);
+      st05.add(labBase);
+
+      const labTurret = new THREE.Group();
+      labTurret.position.set(0, 1.75, 0);
+      const mainDrum = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 0.9, 1.2, 20), MATS.darkSteel);
+      labTurret.add(mainDrum);
+      for (let r = 0; r < 6; r++) {
+        const ang = (r / 6) * Math.PI * 2;
+        const spool = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 0.9, 14), MATS.labelPaper);
+        spool.position.set(Math.cos(ang) * 1.05, 0, Math.sin(ang) * 1.05);
+        labTurret.add(spool);
+      }
+      st05.add(labTurret);
+      animatedParts.labelerCarousel = labTurret;
+
+      const laserUnit = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.65, 0.55), MATS.safetyYellow);
+      laserUnit.position.set(1.55, 1.55, 0.65);
+      st05.add(laserUnit);
+
+      const laserRay = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.015, 0.015, 0.65, 8),
+        new THREE.MeshBasicMaterial({ color: 0xef4444 })
+      );
+      laserRay.rotation.x = Math.PI / 2;
+      laserRay.position.set(1.55, 1.42, 0.3);
+      st05.add(laserRay);
+      animatedParts.laserBeam = laserRay;
+
+      scene.add(st05);
+      registerStationInteractable(st05, st05Data);
+
+      const st06Data = STATIONS_DATA.find(s => s.id === 'ST-06');
+      const st06 = new THREE.Group();
+      st06.position.copy(st06Data.pos);
+
+      const triLower = new THREE.Mesh(new THREE.BoxGeometry(1.5, 1.05, 1.3), MATS.steel);
+      triLower.position.set(0, 0.525, 0);
+      const triUpper = new THREE.Mesh(new THREE.BoxGeometry(1.5, 1.35, 1.3), MATS.steel);
+      triUpper.position.set(0, 2.35, 0);
+      const triDome = new THREE.Mesh(new THREE.CylinderGeometry(0.65, 0.65, 1.5, 20), MATS.steel);
+      triDome.rotation.z = Math.PI / 2;
+      triDome.position.set(0, 3.02, 0);
+      const triScreen = new THREE.Mesh(
+        new THREE.PlaneGeometry(0.65, 0.48),
+        new THREE.MeshBasicMaterial({ color: 0x38bdf8 })
+      );
+      triScreen.position.set(0, 2.45, 0.66);
+      st06.add(triLower, triUpper, triDome, triScreen);
+
+      const camRing = new THREE.Mesh(new THREE.TorusGeometry(0.45, 0.06, 12, 24), MATS.bluePaint);
+      camRing.rotation.y = Math.PI / 2;
+      camRing.position.set(0, 1.42, 0);
+      st06.add(camRing);
+
+      scene.add(st06);
+      registerStationInteractable(st06, st06Data);
+
+      const st07Data = STATIONS_DATA.find(s => s.id === 'ST-07');
+      const st07 = new THREE.Group();
+      st07.position.copy(st07Data.pos);
+
+      const packFrame = new THREE.Mesh(new THREE.BoxGeometry(3.8, 3.2, 2.2), MATS.acrylicGlass);
+      packFrame.position.set(0, 1.7, 0);
+      st07.add(packFrame);
+
+      const packRoof = new THREE.Mesh(new THREE.BoxGeometry(4.0, 0.3, 2.4), MATS.steel);
+      packRoof.position.set(0, 3.35, 0);
+      st07.add(packRoof);
+
+      const dropHead = new THREE.Group();
+      dropHead.position.set(0, 2.3, 0);
+      const headPlate = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.22, 0.9), MATS.bluePaint);
+      dropHead.add(headPlate);
+      st07.add(dropHead);
+      animatedParts.dropPackerHead = dropHead;
+
+      scene.add(st07);
+      registerStationInteractable(st07, st07Data);
+
+      const st08Data = STATIONS_DATA.find(s => s.id === 'ST-08');
+      const st08 = new THREE.Group();
+      st08.position.copy(st08Data.pos);
+
+      const pedestal = new THREE.Mesh(new THREE.BoxGeometry(1.1, 1.1, 1.1), MATS.darkSteel);
+      pedestal.position.set(0, 0.55, 0);
+      st08.add(pedestal);
+
+      const rBase = new THREE.Group();
+      rBase.position.set(0, 1.1, 0);
+      const rTurret = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.48, 0.4, 20), MATS.robotRed);
+      rBase.add(rTurret);
+
+      const rShoulder = new THREE.Group();
+      rShoulder.position.set(0, 0.25, 0);
+      const lowerArm = new THREE.Mesh(new THREE.BoxGeometry(0.28, 1.65, 0.28), MATS.robotRed);
+      lowerArm.position.set(0, 0.8, 0);
+      rShoulder.add(lowerArm);
+
+      const rArm = new THREE.Group();
+      rArm.position.set(0, 1.55, 0);
+      const upperArm = new THREE.Mesh(new THREE.BoxGeometry(1.45, 0.24, 0.24), MATS.robotRed);
+      upperArm.position.set(-0.65, 0, 0);
+      rArm.add(upperArm);
+
+      const rWrist = new THREE.Group();
+      rWrist.position.set(-1.35, -0.2, 0);
+      const gripper = new THREE.Mesh(new THREE.BoxGeometry(0.65, 0.12, 0.55), MATS.darkSteel);
+      rWrist.add(gripper);
+
+      const heldBox = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.38, 0.45), MATS.cardboard);
+      heldBox.position.set(0, -0.26, 0);
+      rWrist.add(heldBox);
+
+      rArm.add(rWrist);
+      rShoulder.add(rArm);
+      rBase.add(rShoulder);
+      st08.add(rBase);
+
+      animatedParts.robotBase = rBase;
+      animatedParts.robotShoulder = rShoulder;
+      animatedParts.robotArm = rArm;
+      animatedParts.robotWrist = rWrist;
+      animatedParts.robotBox = heldBox;
+
+      [-1.8, 1.8].forEach((pz) => {
+        const pal = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.16, 0.8), MATS.woodPallet);
+        pal.position.set(0.8, 0.08, pz);
+        st08.add(pal);
+        for (let bx = 0; bx < 2; bx++) {
+          for (let bz = 0; bz < 2; bz++) {
+            for (let by = 0; by < 2; by++) {
+              const cBox = new THREE.Mesh(new THREE.BoxGeometry(0.52, 0.34, 0.36), MATS.cardboard);
+              cBox.position.set(0.52 + bx * 0.56, 0.33 + by * 0.35, pz - 0.19 + bz * 0.38);
+              cBox.castShadow = true;
+              st08.add(cBox);
+            }
+          }
+        }
+      });
+
+      scene.add(st08);
+      registerStationInteractable(st08, st08Data);
+
+      const stCipData = STATIONS_DATA.find(s => s.id === 'ST-CIP');
+      const stCip = new THREE.Group();
+      stCip.position.copy(stCipData.pos);
+
+      const cipSkid = new THREE.Mesh(new THREE.BoxGeometry(6.8, 0.25, 3.2), MATS.steel);
+      cipSkid.position.set(0, 0.125, 0);
+      stCip.add(cipSkid);
+
+      [-2.1, 0, 2.1].forEach((tx) => {
+        const tankCyl = new THREE.Mesh(new THREE.CylinderGeometry(0.88, 0.88, 3.4, 24), MATS.pipeSanitary);
+        tankCyl.position.set(tx, 1.95, 0);
+        tankCyl.castShadow = true;
+        const dome = new THREE.Mesh(new THREE.SphereGeometry(0.88, 24, 12, 0, Math.PI * 2, 0, Math.PI / 2), MATS.pipeSanitary);
+        dome.position.set(tx, 3.65, 0);
+        stCip.add(tankCyl, dome);
+      });
+
+      const manifold = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 5.2, 12), MATS.steel);
+      manifold.rotation.z = Math.PI / 2;
+      manifold.position.set(0, 1.1, -1.25);
+      stCip.add(manifold);
+
+      scene.add(stCip);
+      registerStationInteractable(stCip, stCipData);
+
+      const stSatData = STATIONS_DATA.find(s => s.id === 'ST-SAT');
+      const stSat = new THREE.Group();
+      stSat.position.copy(stSatData.pos);
+
+      const satSkid = new THREE.Mesh(new THREE.BoxGeometry(3.8, 0.22, 2.4), MATS.steel);
+      satSkid.position.set(0, 0.11, 0);
+      stSat.add(satSkid);
+
+      const cabinet = new THREE.Mesh(new THREE.BoxGeometry(1.1, 2.2, 0.9), MATS.steel);
+      cabinet.position.set(1.0, 1.3, 0);
+      const colSat = new THREE.Mesh(new THREE.CylinderGeometry(0.38, 0.38, 2.6, 20), MATS.pipeSanitary);
+      colSat.position.set(-0.6, 1.5, 0);
+      const gauge = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 0.08, 16), MATS.bluePaint);
+      gauge.rotation.x = Math.PI / 2;
+      gauge.position.set(-0.6, 2.1, -0.42);
+      stSat.add(cabinet, colSat, gauge);
+
+      scene.add(stSat);
+      registerStationInteractable(stSat, stSatData);
+    }
+
+    // =========================================================================
+    // 8. FLUJO DE BOTELLAS, VELOCIDAD DE MÁQUINAS Y MISIÓN DE REPARACIÓN DEL NPC
+    // =========================================================================
+    const NUM_BOTTLES = 46;
+    const bottlesPool = [];
+
+    function createBottleActor(index) {
+      const group = new THREE.Group();
+      const bodyGeo = new THREE.CylinderGeometry(0.085, 0.085, 0.32, 12);
+      const neckGeo = new THREE.CylinderGeometry(0.035, 0.08, 0.16, 12);
+      const glassMat = index % 2 === 0 ? MATS.amberGlass : MATS.greenGlass;
+
+      const body = new THREE.Mesh(bodyGeo, glassMat);
+      body.position.y = 0.16;
+      const neck = new THREE.Mesh(neckGeo, glassMat);
+      neck.position.y = 0.40;
+      group.add(body, neck);
+
+      const beerMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.076, 0.076, 0.28, 10), MATS.beerLiquid);
+      beerMesh.position.y = 0.15;
+      beerMesh.visible = false;
+      group.add(beerMesh);
+
+      const capMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.042, 0.042, 0.03, 10), MATS.crownCap);
+      capMesh.position.y = 0.49;
+      capMesh.visible = false;
+      group.add(capMesh);
+
+      const labelMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.088, 0.088, 0.15, 12), MATS.labelPaper);
+      labelMesh.position.y = 0.17;
+      labelMesh.visible = false;
+      group.add(labelMesh);
+
+      const caseMesh = new THREE.Mesh(new THREE.BoxGeometry(0.48, 0.34, 0.36), MATS.cardboard);
+      caseMesh.position.y = 0.17;
+      caseMesh.visible = false;
+      group.add(caseMesh);
+
+      scene.add(group);
+      return {
+        group,
+        body,
+        neck,
+        beerMesh,
+        capMesh,
+        labelMesh,
+        caseMesh,
+        progress: index / NUM_BOTTLES,
+        rejectedOffset: 0,
+        isRejected: false
+      };
+    }
+
+    function initBottlesFlow() {
+      for (let i = 0; i < NUM_BOTTLES; i++) {
+        bottlesPool.push(createBottleActor(i));
+      }
+    }
+
+    const SPEED_PROFILES = [
+      { mult: 0.5, label: 'Bajo (0%)', color: '#10b981', probPerSec: 0.0 },
+      { mult: 1.0, label: 'Bajo (3%)', color: '#10b981', probPerSec: 0.003 },
+      { mult: 1.5, label: 'Medio (18%)', color: '#fbbf24', probPerSec: 0.025 },
+      { mult: 2.0, label: 'Alto (42%)', color: '#f97316', probPerSec: 0.065 },
+      { mult: 3.0, label: 'Crítico (75%)', color: '#ef4444', probPerSec: 0.135 }
+    ];
+
+    const simState = {
+      running: true,
+      speedProfileIdx: 1,
+      speedMultiplier: 1.0,
+      machineTime: 0,
+      brokenStationId: null,
+      repairingNpcId: null,
+      repairPhase: 'none',
+      repairProgress: 0,
+      breakdownCheckAccum: 0,
+      cipActive: false,
+      forceRejectNext: false,
+      pistonTimer: 0,
+      bottlesOk: 142,
+      bottlesRejected: 2,
+      socialChatterTimer: 1.5,
+      socialChatterIndex: 0
+    };
+
+    function triggerMachineBreakdown(specificStationId = null) {
+      if (simState.brokenStationId) return;
+
+      const lineStations = STATIONS_DATA.filter(s => s.category === 'line');
+      const chosen = specificStationId
+        ? lineStations.find(s => s.id === specificStationId) || lineStations[0]
+        : lineStations[Math.floor(Math.random() * lineStations.length)];
+
+      simState.brokenStationId = chosen.id;
+      simState.repairingNpcId = chosen.responsibleNpc;
+      simState.repairPhase = 'walking_to_machine';
+      simState.repairProgress = 0;
+
+      breakdownBeaconGroup.visible = true;
+      breakdownBeaconGroup.position.set(chosen.pos.x, 4.4, chosen.pos.z);
+
+      const npcActor = npcObjectsMap.get(chosen.responsibleNpc);
+      if (npcActor) {
+        npcActor.forcedAnimTimer = 0;
+        npcActor.talkingToPlayer = false;
+        npcActor.repairTargetStation = chosen;
+        const goMsg = `¡Aquí ${npcActor.data.name}! Detecté una alarma en ${chosen.id}. Voy caminando hacia la máquina para repararla.`;
+        showNpcOverheadSpeech(npcActor, `🏃‍♂️ En camino a reparar ${chosen.id}...`, 8.0);
+        speakNpcText(npcActor.data, goMsg, false);
+      }
+
+      updateBrokenUiBadges();
+      updateHudMetrics();
+      openStationInspector(chosen.id, true);
+      showToast(`🚨 ¡Avería en ${chosen.id}! Observa cómo ${npcActor ? npcActor.data.name : 'el operador'} camina hacia la máquina para repararla.`);
+    }
+
+    function completeMachineRepair(stationData, npcActor) {
+      const repairedId = stationData.id;
+      simState.brokenStationId = null;
+      simState.repairingNpcId = null;
+      simState.repairPhase = 'none';
+      simState.repairProgress = 0;
+
+      breakdownBeaconGroup.visible = false;
+      repairSparksGroup.visible = false;
+
+      if (npcActor) {
+        npcActor.wrenchMesh.visible = false;
+        npcActor.repairTargetStation = null;
+        npcActor.lastRepairSpeech = stationData.repairExplanation;
+        npcActor.talkingToPlayer = true;
+        activeDialogueNpcId = npcActor.data.id;
+        npcActor.currentAnim = 'Talk_To_Player';
+
+        showNpcOverheadSpeech(npcActor, `✅ "${stationData.repairExplanation}"`, 14.0);
+        openNpcDialogue(npcActor.data.id, false, stationData.repairExplanation, `¿Cómo arreglaste la máquina ${repairedId}?`);
+      }
+
+      updateBrokenUiBadges();
+      updateHudMetrics();
+      showToast(`✅ ${npcActor ? npcActor.data.name : 'Operador'} terminó de reparar ${repairedId}, te mira y te explica cómo lo hizo`);
+    }
+
+    function updateBottlesAndMachines(dt, elapsed) {
+      const isHalted = !simState.running || (simState.brokenStationId !== null);
+      const effSpeed = isHalted ? 0 : simState.speedMultiplier;
+
+      simState.machineTime += dt * effSpeed;
+      const mt = simState.machineTime;
+
+      if (!isHalted) {
+        simState.breakdownCheckAccum += dt;
+        if (simState.breakdownCheckAccum >= 1.0) {
+          simState.breakdownCheckAccum = 0;
+          const profile = SPEED_PROFILES[simState.speedProfileIdx];
+          if (Math.random() < profile.probPerSec) {
+            triggerMachineBreakdown();
+          }
+        }
+      }
+
+      if (simState.brokenStationId && breakdownBeaconGroup.visible) {
+        breakdownBeaconGroup.rotation.y += dt * 6.0;
+        const pulseScale = 1.0 + Math.sin(elapsed * 10) * 0.18;
+        breakdownBeaconGroup.scale.set(pulseScale, pulseScale, pulseScale);
+      }
+
+      if (repairSparksGroup.visible) {
+        sparkMeshes.forEach((sp, idx) => {
+          const r = 0.25 + ((elapsed * sp.speed + idx * 0.2) % 0.65);
+          sp.mesh.position.set(
+            Math.cos(sp.angle + elapsed * 5) * r,
+            Math.abs(Math.sin(elapsed * 8 + idx)) * 0.55,
+            Math.sin(sp.angle + elapsed * 5) * r
+          );
+        });
+      }
+
+      if (animatedParts.depalletizerGantry) {
+        animatedParts.depalletizerGantry.position.y = 3.15 + Math.sin(mt * 2.0) * 0.35;
+      }
+      if (animatedParts.rinserCarousel) {
+        animatedParts.rinserCarousel.rotation.y = mt * 1.8;
+      }
+      if (animatedParts.fillerCarousel) {
+        animatedParts.fillerCarousel.rotation.y = -mt * 1.4;
+      }
+      if (animatedParts.capperCarousel) {
+        animatedParts.capperCarousel.rotation.y = mt * 2.2;
+      }
+      if (animatedParts.labelerCarousel) {
+        animatedParts.labelerCarousel.rotation.y = -mt * 2.5;
+      }
+      if (animatedParts.laserBeam) {
+        animatedParts.laserBeam.visible = (Math.floor(mt * 14) % 2 === 0) && effSpeed > 0;
+      }
+      if (animatedParts.dropPackerHead) {
+        animatedParts.dropPackerHead.position.y = 2.05 + Math.abs(Math.sin(mt * 2.5)) * 0.55;
+      }
+
+      if (animatedParts.robotBase) {
+        const cycle = mt * 1.3;
+        animatedParts.robotBase.rotation.y = Math.sin(cycle) * 1.15;
+        animatedParts.robotShoulder.rotation.z = Math.cos(cycle * 2) * 0.28;
+        animatedParts.robotArm.rotation.z = -0.2 + Math.sin(cycle * 2) * 0.25;
+        animatedParts.robotWrist.rotation.y = -animatedParts.robotBase.rotation.y;
+      }
+
+      const startX = -33.0;
+      const endX = 40.5;
+      const spanX = endX - startX;
+      conveyorSlats.forEach((s) => {
+        if (effSpeed > 0) {
+          s.progress = (s.progress + dt * 0.024 * effSpeed) % 1.0;
+        }
+        s.mesh.position.x = startX + s.progress * spanX;
+      });
+
+      if (simState.pistonTimer > 0) {
+        simState.pistonTimer -= dt;
+        if (animatedParts.fbiPiston) animatedParts.fbiPiston.position.z = -0.02;
+        if (animatedParts.fbiLight) {
+          animatedParts.fbiLight.material.color.setHex(0xef4444);
+          animatedParts.fbiLight.material.emissive.setHex(0xef4444);
+        }
+      } else {
+        if (animatedParts.fbiPiston) animatedParts.fbiPiston.position.z = -0.28;
+        if (animatedParts.fbiLight) {
+          animatedParts.fbiLight.material.color.setHex(0x10b981);
+          animatedParts.fbiLight.material.emissive.setHex(0x10b981);
+        }
+      }
+
+      MATS.cipGlowPipe.emissiveIntensity = simState.cipActive ? (0.45 + 0.35 * Math.sin(elapsed * 6)) : 0.05;
+
+      bottlesPool.forEach((b) => {
+        if (effSpeed > 0) {
+          b.progress += dt * 0.024 * effSpeed;
+          if (b.progress >= 1.0) {
+            b.progress -= 1.0;
+            b.isRejected = false;
+            b.rejectedOffset = 0;
+            simState.bottlesOk++;
+            updateHudMetrics();
+          }
+        }
+
+        const xPos = startX + b.progress * spanX;
+        let zPos = -4.0;
+        let yPos = 1.19;
+
+        if (xPos > -22.8 && xPos < -17.2) {
+          const norm = (xPos - (-20.0)) / 2.8;
+          zPos = -4.0 + Math.cos(norm * Math.PI * 0.5) * 0.65;
+        }
+
+        if (simState.forceRejectNext && Math.abs(xPos - 10.35) < 0.45 && !b.isRejected) {
+          b.isRejected = true;
+          simState.forceRejectNext = false;
+          simState.pistonTimer = 0.65;
+          simState.bottlesRejected++;
+          updateHudMetrics();
+          showToast('ST-04 FBI: Envase no conforme descartado por el pistón neumático');
+        }
+
+        if (b.isRejected) {
+          b.rejectedOffset = Math.min(1.0, b.rejectedOffset + dt * 3.5);
+          zPos = -4.0 + b.rejectedOffset * 0.95;
+          yPos = 1.19 - b.rejectedOffset * 0.08;
+        }
+
+        const isCaseStage = xPos >= 33.2 && !b.isRejected;
+        b.body.visible = !isCaseStage;
+        b.neck.visible = !isCaseStage;
+        b.beerMesh.visible = !isCaseStage && xPos >= -20.0;
+        b.capMesh.visible = !isCaseStage && xPos >= -17.8;
+        b.labelMesh.visible = !isCaseStage && xPos >= 18.0;
+        b.caseMesh.visible = isCaseStage;
+
+        b.group.position.set(xPos, yPos, zPos);
+      });
+    }
+
+    // =========================================================================
+    // 9. NPCS CON MIRADA PERSISTENTE AL JUGADOR Y REUNIÓN DE DESCANSO ENTRE ELLOS
+    // =========================================================================
+    const npcActors = [];
+
+    function createNpcActor(npcData) {
+      const root = new THREE.Group();
+      const firstWp = npcData.waypoints[0];
+      root.position.copy(firstWp.pos);
+
+      const suitMat = new THREE.MeshStandardMaterial({ color: npcData.suitColor, roughness: 0.5 });
+      const skinMat = new THREE.MeshStandardMaterial({ color: 0xf1c27d, roughness: 0.6 });
+      const helmetMat = new THREE.MeshStandardMaterial({ color: npcData.helmetColor, roughness: 0.3, metalness: 0.2 });
+      const vestMat = new THREE.MeshStandardMaterial({ color: 0x84cc16, emissive: 0x365314, emissiveIntensity: 0.2 });
+
+      const leftLeg = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.72, 0.18), MATS.darkSteel);
+      leftLeg.position.set(-0.11, 0.36, 0);
+      const rightLeg = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.72, 0.18), MATS.darkSteel);
+      rightLeg.position.set(0.11, 0.36, 0);
+      root.add(leftLeg, rightLeg);
+
+      const torsoGroup = new THREE.Group();
+      torsoGroup.position.set(0, 1.05, 0);
+      const torso = new THREE.Mesh(new THREE.BoxGeometry(0.44, 0.68, 0.26), suitMat);
+      torso.castShadow = true;
+      const vest = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.45, 0.28), vestMat);
+      vest.position.y = 0.05;
+      torsoGroup.add(torso, vest);
+
+      const headGroup = new THREE.Group();
+      headGroup.position.set(0, 0.52, 0);
+      const head = new THREE.Mesh(new THREE.SphereGeometry(0.16, 16, 16), skinMat);
+      const helmet = new THREE.Mesh(new THREE.SphereGeometry(0.185, 16, 12, 0, Math.PI * 2, 0, Math.PI * 0.58), helmetMat);
+      helmet.position.y = 0.03;
+      const visor = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.04, 0.12), helmetMat);
+      visor.position.set(0, 0.04, 0.15);
+      headGroup.add(head, helmet, visor);
+      torsoGroup.add(headGroup);
+
+      const leftArm = new THREE.Group();
+      leftArm.position.set(-0.29, 0.24, 0);
+      const lArmMesh = new THREE.Mesh(new THREE.BoxGeometry(0.13, 0.58, 0.13), suitMat);
+      lArmMesh.position.y = -0.24;
+      leftArm.add(lArmMesh);
+
+      // Vaso térmico de café 3D en la mano izquierda (visible durante la pausa social cuando paras las máquinas)
+      const coffeeCupGroup = new THREE.Group();
+      coffeeCupGroup.position.set(0, -0.52, 0.10);
+      const cupBody = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.048, 0.038, 0.13, 12),
+        new THREE.MeshStandardMaterial({ color: 0xfef3c7, roughness: 0.4 })
+      );
+      const cupLid = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.052, 0.052, 0.02, 12),
+        new THREE.MeshStandardMaterial({ color: 0x78350f })
+      );
+      cupLid.position.y = 0.07;
+      coffeeCupGroup.add(cupBody, cupLid);
+      coffeeCupGroup.visible = false;
+      leftArm.add(coffeeCupGroup);
+
+      const rightArm = new THREE.Group();
+      rightArm.position.set(0.29, 0.24, 0);
+      const rArmMesh = new THREE.Mesh(new THREE.BoxGeometry(0.13, 0.58, 0.13), suitMat);
+      rArmMesh.position.y = -0.24;
+      rightArm.add(rArmMesh);
+
+      const wrenchGroup = new THREE.Group();
+      wrenchGroup.position.set(0, -0.52, 0.12);
+      const wrenchHandle = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.36, 0.05), MATS.safetyYellow);
+      wrenchHandle.rotation.x = Math.PI / 2;
+      const wrenchJaw = new THREE.Mesh(new THREE.TorusGeometry(0.08, 0.025, 8, 16, Math.PI * 1.35), MATS.steel);
+      wrenchJaw.position.set(0, 0, 0.22);
+      wrenchJaw.rotation.x = Math.PI / 2;
+      wrenchGroup.add(wrenchHandle, wrenchJaw);
+      wrenchGroup.visible = false;
+      rightArm.add(wrenchGroup);
+
+      torsoGroup.add(leftArm, rightArm);
+      root.add(torsoGroup);
+
+      const npcRing = new THREE.Mesh(
+        new THREE.RingGeometry(0.42, 0.52, 24),
+        new THREE.MeshBasicMaterial({ color: 0x38bdf8, side: THREE.DoubleSide })
+      );
+      npcRing.rotation.x = -Math.PI / 2;
+      npcRing.position.y = 0.02;
+      root.add(npcRing);
+
+      root.traverse((child) => {
+        if (child.isMesh) {
+          child.userData.npcId = npcData.id;
+          interactableMeshes.push(child);
+        }
+      });
+
+      scene.add(root);
+
+      const actor = {
+        data: npcData,
+        root,
+        torsoGroup,
+        headGroup,
+        leftLeg,
+        rightLeg,
+        leftArm,
+        rightArm,
+        wrenchMesh: wrenchGroup,
+        coffeeCupMesh: coffeeCupGroup,
+        wpIndex: 0,
+        state: 'working',
+        timer: 5.5,
+        currentAnim: firstWp.anim,
+        forcedAnimTimer: 0,
+        talkingToPlayer: false,
+        isSpeakingAudio: false,
+        inBreakCircle: false,
+        repairTargetStation: null,
+        lastRepairSpeech: null,
+        speechBubbleText: null,
+        speechBubbleTimer: 0,
+        conversationCount: 0
+      };
+
+      npcActors.push(actor);
+      npcObjectsMap.set(npcData.id, actor);
+      return actor;
+    }
+
+    function initNpcs() {
+      NPCS_DATA.forEach(createNpcActor);
+    }
+
+    function rotateActorSmoothlyTowards(actor, targetPoint, dt, speed = 7.0) {
+      const dx = targetPoint.x - actor.root.position.x;
+      const dz = targetPoint.z - actor.root.position.z;
+      const desiredYaw = Math.atan2(dx, dz);
+      let diff = desiredYaw - actor.root.rotation.y;
+      while (diff > Math.PI) diff -= Math.PI * 2;
+      while (diff < -Math.PI) diff += Math.PI * 2;
+      actor.root.rotation.y += diff * Math.min(1.0, dt * speed);
+    }
+
+    function updateNpcs(dt, elapsed) {
+      const camWorldPos = new THREE.Vector3();
+      camera.getWorldPosition(camWorldPos);
+
+      // Si las máquinas están detenidas (!simState.running) y no hay avería activa, coordinar la charla grupal entre los 3 NPCs
+      const allArrivedBreak = !simState.running && !simState.brokenStationId && npcActors.every(a => a.inBreakCircle);
+      if (allArrivedBreak && !activeDialogueNpcId) {
+        simState.socialChatterTimer -= dt;
+        if (simState.socialChatterTimer <= 0) {
+          const line = SOCIAL_BREAK_CHATTER[simState.socialChatterIndex % SOCIAL_BREAK_CHATTER.length];
+          simState.socialChatterIndex++;
+          simState.socialChatterTimer = 7.5;
+          const speakerActor = npcObjectsMap.get(line.npcId);
+          if (speakerActor) {
+            speakerActor.currentAnim = line.anim;
+            showNpcOverheadSpeech(speakerActor, `☕ ${line.text}`, 7.0);
+            if (!window.speechSynthesis || !window.speechSynthesis.speaking) {
+              speakNpcText(speakerActor.data, line.text, false);
+            }
+          }
+        }
+      }
+
+      npcActors.forEach((actor) => {
+        if (actor.speechBubbleTimer > 0) {
+          actor.speechBubbleTimer -= dt;
+          if (actor.speechBubbleTimer <= 0 && activeDialogueNpcId !== actor.data.id) {
+            actor.speechBubbleText = null;
+          }
+        }
+
+        // 1) MISIÓN PRIORITARIA: Reparar una máquina averiada
+        if (actor.repairTargetStation && simState.brokenStationId === actor.repairTargetStation.id) {
+          actor.coffeeCupMesh.visible = false;
+          actor.inBreakCircle = false;
+          const st = actor.repairTargetStation;
+          const targetSpot = st.repairSpot || new THREE.Vector3(st.pos.x, 0, st.pos.z + 2.0);
+          const dist = actor.root.position.distanceTo(targetSpot);
+
+          if (simState.repairPhase === 'walking_to_machine') {
+            if (dist > 0.22) {
+              const dir = new THREE.Vector3().subVectors(targetSpot, actor.root.position).normalize();
+              actor.root.position.addScaledVector(dir, dt * 3.8);
+              rotateActorSmoothlyTowards(actor, targetSpot, dt, 10.0);
+              actor.wrenchMesh.visible = true;
+              applyProceduralNpcAnimation(actor, 'Walk', elapsed * 1.35, true);
+            } else {
+              actor.root.position.copy(targetSpot);
+              actor.root.rotation.y = Math.PI;
+              simState.repairPhase = 'fixing_machine';
+              simState.repairProgress = 0;
+              actor.wrenchMesh.visible = true;
+
+              repairSparksGroup.visible = true;
+              repairSparksGroup.position.set(st.pos.x, 1.55, st.pos.z + 1.15);
+
+              showNpcOverheadSpeech(actor, `🔧 Reparando ${st.id} con herramientas...`, 6.0);
+              showToast(`🔧 ${actor.data.name} llegó a ${st.id} y está reparando la avería...`);
+            }
+          } else if (simState.repairPhase === 'fixing_machine') {
+            actor.root.rotation.y = Math.PI;
+            actor.wrenchMesh.visible = true;
+            applyProceduralNpcAnimation(actor, 'Fix_Bottle_Jam', elapsed, false);
+
+            simState.repairProgress = Math.min(1.0, simState.repairProgress + dt / 5.5);
+            const pct = Math.round(simState.repairProgress * 100);
+            const fillEl = document.getElementById('repair-bar-fill');
+            const pctEl = document.getElementById('repair-pct-label');
+            if (fillEl) fillEl.style.width = `${pct}%`;
+            if (pctEl) pctEl.textContent = `${pct}%`;
+
+            if (simState.repairProgress >= 1.0) {
+              completeMachineRepair(st, actor);
+            }
+          }
+          return;
+        }
+
+        // 2) CONVERSACIÓN CON EL JUGADOR: El NPC se queda quieto, mirándote fijamente a los ojos y NO se va
+        const isEngagedWithPlayer =
+          actor.talkingToPlayer ||
+          activeDialogueNpcId === actor.data.id ||
+          actor.isSpeakingAudio ||
+          (isListeningMic && activeNpcForVoice === actor.data.id);
+
+        if (isEngagedWithPlayer) {
+          actor.wrenchMesh.visible = false;
+          // Gira suavemente su cuerpo hacia tu posición actual en 3D
+          rotateActorSmoothlyTowards(actor, camWorldPos, dt, 8.5);
+
+          // Mientras su voz está sonando o tiene una animación de habla, gesticula mirándote; cuando termina el audio, te mira atento esperando tu respuesta
+          const speakingNow = actor.isSpeakingAudio || (window.speechSynthesis && window.speechSynthesis.speaking && currentlySpeakingNpcId === actor.data.id);
+          const animToUse = speakingNow ? 'Talk_To_Player' : (actor.forcedAnimTimer > 0 ? actor.currentAnim : 'Listen_To_Player');
+          if (actor.forcedAnimTimer > 0) actor.forcedAnimTimer -= dt;
+
+          applyProceduralNpcAnimation(actor, animToUse, elapsed, false);
+
+          // Inclina ligeramente la cabeza hacia la altura de tus ojos
+          const horizDist = Math.hypot(camWorldPos.x - actor.root.position.x, camWorldPos.z - actor.root.position.z);
+          const dy = (camWorldPos.y - 1.55);
+          const targetPitch = Math.max(-0.35, Math.min(0.35, -Math.atan2(dy, Math.max(1.5, horizDist)) * 0.6));
+          actor.headGroup.rotation.x += targetPitch;
+          return;
+        }
+
+        // 3) PAUSA OPERATIVA / REUNIÓN SOCIAL EN LA VIDA REAL: Cuando paras todas las máquinas (!simState.running)
+        if (!simState.running && !simState.brokenStationId) {
+          actor.wrenchMesh.visible = false;
+          const breakSpot = actor.data.breakSpot;
+          const distToBreak = actor.root.position.distanceTo(breakSpot);
+
+          if (distToBreak > 0.18) {
+            actor.inBreakCircle = false;
+            actor.coffeeCupMesh.visible = false;
+            const dir = new THREE.Vector3().subVectors(breakSpot, actor.root.position).normalize();
+            actor.root.position.addScaledVector(dir, dt * 2.8);
+            rotateActorSmoothlyTowards(actor, breakSpot, dt, 9.0);
+            applyProceduralNpcAnimation(actor, 'Walk', elapsed * 1.15, true);
+          } else {
+            actor.root.position.copy(breakSpot);
+            actor.inBreakCircle = true;
+            actor.coffeeCupMesh.visible = true;
+            // Se miran entre ellos hacia el centro del círculo de descanso
+            rotateActorSmoothlyTowards(actor, BREAK_MEETING_CENTER, dt, 7.0);
+            const socialAnim = actor.currentAnim && (actor.currentAnim === 'Drink_Coffee' || actor.currentAnim === 'Stretch_Break' || actor.currentAnim === 'Talk_To_Colleagues')
+              ? actor.currentAnim
+              : 'Drink_Coffee';
+            applyProceduralNpcAnimation(actor, socialAnim, elapsed, false);
+          }
+          return;
+        }
+
+        // 4) PATRULLAJE Y TRABAJO NORMAL EN SUS ESTACIONES
+        actor.inBreakCircle = false;
+        actor.coffeeCupMesh.visible = false;
+        actor.wrenchMesh.visible = (actor.currentAnim === 'Fix_Bottle_Jam' && actor.forcedAnimTimer > 0);
+
+        if (actor.forcedAnimTimer > 0) {
+          actor.forcedAnimTimer -= dt;
+          applyProceduralNpcAnimation(actor, actor.currentAnim, elapsed, false);
+          return;
+        }
+
+        const targetWp = actor.data.waypoints[actor.wpIndex];
+        const dist = actor.root.position.distanceTo(targetWp.pos);
+
+        if (actor.state === 'walking') {
+          if (dist > 0.15) {
+            const dir = new THREE.Vector3().subVectors(targetWp.pos, actor.root.position).normalize();
+            actor.root.position.addScaledVector(dir, dt * 2.4);
+            rotateActorSmoothlyTowards(actor, targetWp.pos, dt, 9.0);
+            applyProceduralNpcAnimation(actor, 'Walk', elapsed, true);
+          } else {
+            actor.root.position.copy(targetWp.pos);
+            actor.state = 'working';
+            actor.timer = 6.5;
+            actor.currentAnim = targetWp.anim;
+            actor.root.rotation.y = targetWp.pos.z > 2 ? 0 : Math.PI;
+          }
+        } else {
+          actor.timer -= dt;
+          applyProceduralNpcAnimation(actor, actor.currentAnim, elapsed, false);
+          if (actor.timer <= 0) {
+            actor.wpIndex = (actor.wpIndex + 1) % actor.data.waypoints.length;
+            actor.state = 'walking';
+          }
+        }
+      });
+    }
+
+    function applyProceduralNpcAnimation(actor, animName, t, isWalking) {
+      actor.torsoGroup.rotation.set(0, 0, 0);
+      actor.headGroup.rotation.set(0, 0, 0);
+
+      if (isWalking) {
+        actor.leftLeg.rotation.x = Math.sin(t * 7) * 0.55;
+        actor.rightLeg.rotation.x = -Math.sin(t * 7) * 0.55;
+        actor.leftArm.rotation.x = -Math.sin(t * 7) * 0.45;
+        actor.rightArm.rotation.x = Math.sin(t * 7) * 0.45;
+        actor.leftArm.rotation.z = 0;
+        actor.rightArm.rotation.z = 0;
+        return;
+      }
+
+      actor.leftLeg.rotation.x = 0;
+      actor.rightLeg.rotation.x = 0;
+      actor.leftArm.rotation.z = 0;
+      actor.rightArm.rotation.z = 0;
+
+      switch (animName) {
+        case 'Talk_To_Player':
+          // Gesticulación natural cara a cara mientras el NPC te habla con su voz
+          actor.leftArm.rotation.x = -0.65 + Math.sin(t * 6.5) * 0.25;
+          actor.rightArm.rotation.x = -0.85 + Math.cos(t * 5.8) * 0.32;
+          actor.rightArm.rotation.z = -0.15 + Math.sin(t * 4.5) * 0.12;
+          actor.headGroup.rotation.x = Math.sin(t * 5.0) * 0.09;
+          actor.headGroup.rotation.y = Math.cos(t * 3.2) * 0.08;
+          break;
+        case 'Listen_To_Player':
+          // Postura atenta mirándote a los ojos y asintiendo suavemente mientras te escucha
+          actor.leftArm.rotation.x = -0.25;
+          actor.rightArm.rotation.x = -0.35;
+          actor.headGroup.rotation.x = Math.sin(t * 2.2) * 0.06;
+          actor.headGroup.rotation.y = Math.sin(t * 1.5) * 0.05;
+          break;
+        case 'Drink_Coffee':
+          // Toma sorbos de su vaso térmico de café y conversa con sus colegas
+          actor.leftArm.rotation.x = -1.35 + Math.sin(t * 2.4) * 0.45;
+          actor.rightArm.rotation.x = -0.55 + Math.cos(t * 3.8) * 0.22;
+          actor.headGroup.rotation.y = Math.sin(t * 2.0) * 0.25;
+          actor.headGroup.rotation.x = Math.sin(t * 2.4) * 0.12;
+          break;
+        case 'Stretch_Break':
+          // Pausa activa ergonómica: estiramiento de brazos y torso durante la parada de planta
+          actor.leftArm.rotation.x = -2.4 + Math.sin(t * 3.0) * 0.25;
+          actor.rightArm.rotation.x = -2.4 + Math.sin(t * 3.0) * 0.25;
+          actor.torsoGroup.rotation.y = Math.sin(t * 2.0) * 0.22;
+          actor.headGroup.rotation.x = -0.18;
+          break;
+        case 'Talk_To_Colleagues':
+          actor.leftArm.rotation.x = -1.05;
+          actor.rightArm.rotation.x = -0.95 + Math.sin(t * 5.5) * 0.35;
+          actor.headGroup.rotation.y = Math.sin(t * 2.8) * 0.32;
+          break;
+        case 'Idle_HMI_Touch':
+          actor.rightArm.rotation.x = -1.15 + Math.sin(t * 5) * 0.15;
+          actor.leftArm.rotation.x = -0.3;
+          actor.headGroup.rotation.x = 0.12 * Math.sin(t * 3);
+          break;
+        case 'Pour_Caps_Hopper':
+          actor.leftArm.rotation.x = -2.3 + Math.sin(t * 4) * 0.2;
+          actor.rightArm.rotation.x = -2.3 + Math.sin(t * 4) * 0.2;
+          actor.headGroup.rotation.x = -0.35;
+          break;
+        case 'Inspect_Glass_Panel':
+          actor.torsoGroup.rotation.x = 0.38;
+          actor.headGroup.rotation.y = Math.sin(t * 2.5) * 0.35;
+          actor.leftArm.rotation.x = -0.4;
+          actor.rightArm.rotation.x = -0.4;
+          break;
+        case 'Fix_Bottle_Jam':
+          actor.torsoGroup.rotation.x = 0.32 + Math.sin(t * 6) * 0.08;
+          actor.leftArm.rotation.x = -1.35 + Math.sin(t * 11) * 0.4;
+          actor.rightArm.rotation.x = -1.55 - Math.sin(t * 11) * 0.45;
+          actor.rightArm.rotation.z = Math.cos(t * 11) * 0.25;
+          break;
+        case 'Check_Clipboard_Write':
+          actor.leftArm.rotation.x = -0.95;
+          actor.rightArm.rotation.x = -1.05 + Math.sin(t * 8) * 0.12;
+          actor.headGroup.rotation.x = 0.22;
+          break;
+        case 'Inspect_Gauge_Up':
+          actor.headGroup.rotation.x = -0.45;
+          actor.rightArm.rotation.x = -0.8;
+          actor.leftArm.rotation.x = 0;
+          break;
+        case 'Pick_Rejected_Bottle':
+          actor.torsoGroup.rotation.x = 0.3 + Math.sin(t * 3) * 0.2;
+          actor.rightArm.rotation.x = -1.25 + Math.sin(t * 3) * 0.3;
+          actor.leftArm.rotation.x = -0.5;
+          break;
+        case 'Operate_CIP_Valves':
+          actor.leftArm.rotation.x = -1.1;
+          actor.rightArm.rotation.x = -1.1;
+          actor.leftArm.rotation.z = Math.sin(t * 5) * 0.25;
+          actor.rightArm.rotation.z = -Math.sin(t * 5) * 0.25;
+          break;
+        case 'Forklift_Signal':
+          actor.rightArm.rotation.x = -2.3 + Math.sin(t * 6) * 0.35;
+          actor.leftArm.rotation.x = -0.5;
+          actor.headGroup.rotation.y = Math.sin(t * 3) * 0.15;
+          break;
+        case 'Inspect_Robot_Arm':
+          actor.headGroup.rotation.y = Math.sin(t * 1.8) * 0.45;
+          actor.leftArm.rotation.x = -0.5;
+          actor.rightArm.rotation.x = -0.5;
+          break;
+        default:
+          actor.leftArm.rotation.x = 0;
+          actor.rightArm.rotation.x = 0;
+      }
+    }
+
+    // =========================================================================
+    // 10. PANEL HOLOGRÁFICO 3D ESPACIAL PARA META QUEST 2/3 (WEBXR INMERSIVO)
+    // =========================================================================
+    const vrSpatialPanel = new THREE.Group();
+    vrSpatialPanel.visible = false;
+    scene.add(vrSpatialPanel);
+
+    const vrCanvas = document.createElement('canvas');
+    vrCanvas.width = 1024;
+    vrCanvas.height = 680;
+    const vrCtx = vrCanvas.getContext('2d');
+    const vrTexture = new THREE.CanvasTexture(vrCanvas);
+
+    const vrBoardMesh = new THREE.Mesh(
+      new THREE.PlaneGeometry(2.4, 1.6),
+      new THREE.MeshBasicMaterial({ map: vrTexture, side: THREE.DoubleSide })
+    );
+    vrSpatialPanel.add(vrBoardMesh);
+
+    function createVrButton(label, xOffset, colorHex, actionType) {
+      const btnGeo = new THREE.BoxGeometry(0.68, 0.22, 0.05);
+      const btnMat = new THREE.MeshBasicMaterial({ color: colorHex });
+      const mesh = new THREE.Mesh(btnGeo, btnMat);
+      mesh.position.set(xOffset, -0.96, 0.03);
+      mesh.userData = { isVrUiButton: true, actionType };
+      vrSpatialPanel.add(mesh);
+      interactableMeshes.push(mesh);
+      return mesh;
+    }
+    const vrBtnOptA = createVrButton('Opción A', -0.78, 0x0284c7, 'optA');
+    const vrBtnOptB = createVrButton('Opción B / Mic', 0.0, 0x0d9488, 'optB');
+    const vrBtnClose = createVrButton('Cerrar', 0.78, 0xdc2626, 'close');
+
+    let activeVrContext = null;
+
+    function wrapCanvasText(ctx, text, x, y, maxWidth, lineHeight) {
+      const words = text.split(' ');
+      let line = '';
+      let curY = y;
+      for (let n = 0; n < words.length; n++) {
+        const testLine = line + words[n] + ' ';
+        const metrics = ctx.measureText(testLine);
+        if (metrics.width > maxWidth && n > 0) {
+          ctx.fillText(line, x, curY);
+          line = words[n] + ' ';
+          curY += lineHeight;
+        } else {
+          line = testLine;
+        }
+      }
+      ctx.fillText(line, x, curY);
+      return curY + lineHeight;
+    }
+
+    function renderVrSpatialBoard(headerTag, title, subtitle, mainBody, speakerLine, optALabel, optBLabel) {
+      vrCtx.fillStyle = '#0f172a';
+      vrCtx.fillRect(0, 0, vrCanvas.width, vrCanvas.height);
+
+      vrCtx.strokeStyle = '#f59e0b';
+      vrCtx.lineWidth = 6;
+      vrCtx.strokeRect(10, 10, vrCanvas.width - 20, vrCanvas.height - 20);
+
+      vrCtx.fillStyle = '#fbbf24';
+      vrCtx.font = 'bold 26px sans-serif';
+      vrCtx.fillText(headerTag, 36, 56);
+
+      vrCtx.fillStyle = '#ffffff';
+      vrCtx.font = 'bold 34px sans-serif';
+      vrCtx.fillText(title.slice(0, 48), 36, 102);
+
+      vrCtx.fillStyle = '#38bdf8';
+      vrCtx.font = 'bold 24px sans-serif';
+      vrCtx.fillText(subtitle.slice(0, 62), 36, 140);
+
+      vrCtx.fillStyle = '#e2e8f0';
+      vrCtx.font = '24px sans-serif';
+      let nextY = wrapCanvasText(vrCtx, mainBody, 36, 195, 950, 34);
+
+      if (speakerLine) {
+        nextY += 16;
+        vrCtx.fillStyle = '#fef08a';
+        vrCtx.font = 'italic 25px sans-serif';
+        nextY = wrapCanvasText(vrCtx, speakerLine, 36, nextY, 950, 34);
+      }
+
+      vrCtx.fillStyle = '#94a3b8';
+      vrCtx.font = 'bold 21px sans-serif';
+      const footerHint = [
+        optALabel ? `[Botón Azul Izq]: ${optALabel}` : '',
+        optBLabel ? `[Botón Verde Centro]: ${optBLabel}` : '',
+        '[Botón Rojo Der]: Cerrar Panel'
+      ].filter(Boolean).join('   |   ');
+      vrCtx.fillText(footerHint.slice(0, 88), 36, 642);
+
+      vrTexture.needsUpdate = true;
+    }
+
+    function positionVrPanelNearTarget(worldPos) {
+      vrSpatialPanel.visible = true;
+      vrSpatialPanel.position.set(worldPos.x, 2.75, worldPos.z + (worldPos.z > 2 ? -2.2 : 2.2));
+      const camWorldPos = new THREE.Vector3();
+      camera.getWorldPosition(camWorldPos);
+      vrSpatialPanel.lookAt(camWorldPos.x, 2.5, camWorldPos.z);
+    }
+
+    // =========================================================================
+    // 11. INTERFAZ HTML 2D + DIÁLOGO CON MIRADA FIJA Y PERMANENCIA DEL NPC
+    // =========================================================================
+    const inspectorPanel = document.getElementById('inspector-panel');
+    const inspTag = document.getElementById('insp-tag');
+    const inspTitle = document.getElementById('insp-title');
+    const inspSub = document.getElementById('insp-sub');
+    const inspBody = document.getElementById('insp-body');
+
+    function openStationInspector(stationId, moveCamera = false, releaseCurrentNpc = true) {
+      const st = STATIONS_DATA.find(s => s.id === stationId);
+      if (!st) return;
+
+      if (releaseCurrentNpc) {
+        releaseNpcFromConversation();
+      }
+
+      const isThisBroken = simState.brokenStationId === st.id;
+      const respNpc = st.responsibleNpc ? npcObjectsMap.get(st.responsibleNpc) : null;
+      inspTag.textContent = isThisBroken ? `🚨 ${st.id} • ¡EN REPARACIÓN POR NPC!` : `${st.id} • ${st.manufacturer}`;
+      inspTitle.textContent = st.name;
+      inspSub.textContent = st.modelName;
+
+      const specsHtml = Object.entries(st.specs).map(([k, v]) => `
+        <div class="spec-box">
+          <div class="spec-box-label">${k}</div>
+          <div class="spec-box-val">${v}</div>
+        </div>
+      `).join('');
+
+      const pct = Math.round(simState.repairProgress * 100);
+      const breakdownAlertHtml = isThisBroken ? `
+        <div class="alert-breakdown-box">
+          <strong>⚠️ Falla Detectada (${simState.speedMultiplier.toFixed(1)}x):</strong>
+          <span>${st.failureReason}</span>
+          <div style="margin-top:4px;font-weight:700;color:#fef08a;">
+            👷 Técnico asignado: ${respNpc ? respNpc.data.name : 'Operador'}
+            (<span id="repair-pct-label">${simState.repairPhase === 'walking_to_machine' ? 'Caminando hacia la máquina...' : pct + '%'}</span>)
+          </div>
+          <div class="repair-progress-bar-wrap">
+            <div class="repair-progress-bar-fill" id="repair-bar-fill" style="width:${pct}%;"></div>
+          </div>
+          <button class="btn btn-repair" id="btn-insp-repair" style="justify-content:center;width:100%;">
+            ⚡ Completar Reparación Ahora
+          </button>
+        </div>
+      ` : (st.category === 'line' ? `
+        <button class="btn btn-danger" id="btn-break-this-station" style="justify-content:center;width:100%;">
+          💥 Simular Avería en ${st.id} (Ver a ${respNpc ? respNpc.data.name : 'NPC'} repararla)
+        </button>
+      ` : '');
+
+      inspBody.innerHTML = `
+        ${breakdownAlertHtml}
+        <p>${st.description}</p>
+        <div class="spec-grid">${specsHtml}</div>
+      `;
+
+      const btnInspRepair = document.getElementById('btn-insp-repair');
+      if (btnInspRepair) {
+        btnInspRepair.addEventListener('click', () => completeMachineRepair(st, respNpc));
+      }
+
+      const btnBreakThis = document.getElementById('btn-break-this-station');
+      if (btnBreakThis) {
+        btnBreakThis.addEventListener('click', () => triggerMachineBreakdown(st.id));
+      }
+
+      inspectorPanel.classList.remove('hidden');
+
+      activeVrContext = { type: 'station', station: st };
+      vrBtnOptA.visible = isThisBroken;
+      vrBtnOptB.visible = false;
+      const specSummary = isThisBroken
+        ? `FALLA DETECTADA: ${st.failureReason}`
+        : Object.entries(st.specs).map(([k, v]) => `${k}: ${v}`).join('  •  ');
+      renderVrSpatialBoard(
+        `${st.id} — ${st.manufacturer}`,
+        st.name,
+        st.modelName,
+        st.description,
+        specSummary,
+        isThisBroken ? `Completar Reparación ${st.id}` : null,
+        null
+      );
+      positionVrPanelNearTarget(st.pos);
+
+      if (moveCamera) {
+        focusCameraOnTarget(st.pos, st.lookOffset);
+      }
+    }
+
+    function openNpcDialogue(npcId, moveCamera = false, customAnswer = null, customPlayerPrompt = null) {
+      const actor = npcObjectsMap.get(npcId);
+      if (!actor) return;
+      const npc = actor.data;
+
+      // Liberar otros NPCs y fijar este NPC mirándote sin irse mientras el diálogo esté abierto
+      npcActors.forEach(a => {
+        if (a.data.id !== npcId) a.talkingToPlayer = false;
+      });
+      activeNpcForVoice = npcId;
+      activeDialogueNpcId = npcId;
+      actor.talkingToPlayer = true;
+
+      inspTag.textContent = `👀 MIRÁNDOTE EN VIVO • ${npc.age} AÑOS • ${npc.yearsExp} AÑOS EXP.`;
+      inspTitle.textContent = npc.name;
+      inspSub.textContent = npc.role;
+
+      const currentWp = npc.waypoints[actor.wpIndex];
+      const playerText = customPlayerPrompt || npc.dialogue.playerGreeting;
+      const spokenText = customAnswer || npc.dialogue.initialResponse;
+
+      showNpcOverheadSpeech(actor, spokenText, 16.0);
+      speakNpcText(npc, spokenText, true);
+
+      const optionsHtml = npc.dialogue.options.map((opt, idx) => `
+        <button class="dialogue-opt-btn" data-opt-idx="${idx}">💬 ${opt.label}</button>
+      `).join('');
+
+      const animsHtml = npc.animations.map((a) => `
+        <button class="anim-pill ${actor.currentAnim === a.id ? 'active' : ''}" data-anim-id="${a.id}" title="${a.desc}">
+          ▶ ${a.id}
+        </button>
+      `).join('');
+
+      const liveStateLabel = actor.repairTargetStation
+        ? '🚨 Reparando avería en ' + actor.repairTargetStation.id
+        : (!simState.running
+          ? '☕ En pausa activa charlando con sus compañeros (detenido mirándote a ti)'
+          : `Detenido mirándote a ti (Puesto: ${currentWp.label})`);
+
+      inspBody.innerHTML = `
+        <div class="spec-box" style="border-color:#38bdf8;">
+          <div class="spec-box-label" style="color:#38bdf8;">Estado de Atención del NPC</div>
+          <div class="spec-box-val">👀 ${ liveStateLabel }</div>
+        </div>
+
+        <div class="dialogue-box">
+          <div class="dialogue-speaker">Tú: "${playerText}"</div>
+          <div class="dialogue-speaker" style="color:#38bdf8;">🧠 ${npc.name} (Mirándote y hablando contigo):</div>
+          <div class="dialogue-text">"${spokenText}"</div>
+          <div class="dialogue-options">${optionsHtml}</div>
+
+          <div class="voice-Input-row">
+            <button class="btn btn-mic ${isListeningMic ? 'listening' : ''}" id="btn-insp-mic" title="Hablarle por micrófono a ${npc.name}">
+              ${isListeningMic ? '🛑 Escuchando...' : '🎤 Hablar'}
+            </button>
+            <input type="text" class="voice-text-input" id="npc-custom-question" placeholder="Pregúntale cómo se llama, qué hace..." />
+          </div>
+          <button class="btn" id="btn-release-npc" style="justify-content:center;width:100%;margin-top:4px;">
+            👋 Terminar charla (Dejar que ${npc.name.split(' ')[0]} siga su ronda)
+          </button>
+        </div>
+
+        <div>
+          <div class="spec-box-label" style="margin-bottom:6px;">Matriz de Animaciones (${npc.animations.length}) — Clic para probar:</div>
+          <div class="anim-pills">${animsHtml}</div>
+        </div>
+      `;
+
+      inspBody.querySelectorAll('.dialogue-opt-btn').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const idx = parseInt(btn.getAttribute('data-opt-idx'), 10);
+          const chosen = npc.dialogue.options[idx];
+          if (chosen) {
+            if (chosen.triggerAnim) {
+              actor.currentAnim = chosen.triggerAnim;
+              actor.forcedAnimTimer = 6.0;
+            }
+            openNpcDialogue(npcId, false, chosen.answer, chosen.label);
+          }
+        });
+      });
+
+      const inspMicBtn = document.getElementById('btn-insp-mic');
+      if (inspMicBtn) {
+        inspMicBtn.addEventListener('click', () => toggleMicrophoneInput(npcId));
+      }
+
+      const releaseBtn = document.getElementById('btn-release-npc');
+      if (releaseBtn) {
+        releaseBtn.addEventListener('click', () => {
+          releaseNpcFromConversation(npcId);
+          inspectorPanel.classList.add('hidden');
+          vrSpatialPanel.visible = false;
+          showToast(`👋 ${npc.name} se despide de ti y retoma sus labores.`);
+        });
+      }
+
+      const customInput = document.getElementById('npc-custom-question');
+      if (customInput) {
+        customInput.addEventListener('keydown', (ev) => {
+          ev.stopPropagation();
+          if (ev.key === 'Enter' && customInput.value.trim()) {
+            processUserQuestionToNpc(customInput.value.trim(), npcId);
+          }
+        });
+      }
+
+      inspBody.querySelectorAll('.anim-pill').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const animId = btn.getAttribute('data-anim-id');
+          actor.currentAnim = animId;
+          actor.forcedAnimTimer = 8.0;
+          showToast(`${npc.name} ejecutando animación: ${animId}`);
+        });
+      });
+
+      inspectorPanel.classList.remove('hidden');
+
+      activeVrContext = { type: 'npc', npcId, npc };
+      vrBtnOptA.visible = npc.dialogue.options.length >= 1;
+      vrBtnOptB.visible = npc.dialogue.options.length >= 2;
+      renderVrSpatialBoard(
+        `${npc.code} — ${npc.name} (Mirándote)`,
+        npc.role,
+        liveStateLabel,
+        `Jugador: "${playerText}"`,
+        `${npc.name}: "${spokenText}"`,
+        npc.dialogue.options[0] ? npc.dialogue.options[0].label : null,
+        npc.dialogue.options[1] ? npc.dialogue.options[1].label : null
+      );
+      positionVrPanelNearTarget(actor.root.position);
+
+      if (moveCamera) {
+        const npcPos = actor.root.position.clone();
+        const camOffset = npcPos.clone().add(new THREE.Vector3(0, 2.2, 3.4));
+        focusCameraOnTarget(npcPos.clone().add(new THREE.Vector3(0, 1.35, 0)), camOffset);
+      }
+    }
+
+    document.getElementById('btn-close-inspector').addEventListener('click', () => {
+      releaseNpcFromConversation();
+      inspectorPanel.classList.add('hidden');
+      vrSpatialPanel.visible = false;
+    });
+
+    const stationNavList = document.getElementById('station-nav-list');
+    const stationNavButtonsMap = new Map();
+    STATIONS_DATA.forEach((st) => {
+      const item = document.createElement('button');
+      item.className = 'nav-item';
+      item.innerHTML = `
+        <span class="nav-code ${st.category === 'skid' ? 'skid' : ''}">${st.id}</span>
+        <div>
+          <div class="nav-name">${st.name}</div>
+          <div class="nav-sub">${st.manufacturer}</div>
+        </div>
+      `;
+      item.addEventListener('click', () => openStationInspector(st.id, true));
+      stationNavList.appendChild(item);
+      stationNavButtonsMap.set(st.id, item);
+    });
+
+    const npcNavList = document.getElementById('npc-nav-list');
+    NPCS_DATA.forEach((npc) => {
+      const item = document.createElement('button');
+      item.className = 'nav-item';
+      item.innerHTML = `
+        <span class="nav-code npc">${npc.code}</span>
+        <div>
+          <div class="nav-name">${npc.name}</div>
+          <div class="nav-sub">${npc.stations}</div>
+        </div>
+      `;
+      item.addEventListener('click', () => openNpcDialogue(npc.id, true));
+      npcNavList.appendChild(item);
+    });
+
+    // =========================================================================
+    // 12. ETIQUETAS Y GLOBOS DE DIÁLOGO FLOTANTES 3D -> 2D EN PANTALLA
+    // =========================================================================
+    const labelsContainer = document.getElementById('labels-container');
+    const floatingLabels = [];
+    const stationFloatingLabelMap = new Map();
+
+    function showNpcOverheadSpeech(actor, text, duration = 12.0) {
+      actor.speechBubbleText = text;
+      actor.speechBubbleTimer = duration;
+    }
+
+    function initFloatingLabels() {
+      STATIONS_DATA.forEach((st) => {
+        const el = document.createElement('div');
+        el.className = 'world-label';
+        el.innerHTML = `<span class="tag">${st.id}</span>${st.name.split(' ')[0]} ${st.name.split(' ')[1] || ''}`;
+        el.addEventListener('click', () => openStationInspector(st.id, true));
+        labelsContainer.appendChild(el);
+        stationFloatingLabelMap.set(st.id, { el, st });
+        floatingLabels.push({
+          el,
+          getPos: () => st.pos.clone().add(new THREE.Vector3(0, 4.3, 0))
+        });
+      });
+
+      npcActors.forEach((actor) => {
+        const el = document.createElement('div');
+        el.className = 'world-label npc-label';
+        el.addEventListener('click', () => openNpcDialogue(actor.data.id, true));
+        labelsContainer.appendChild(el);
+        floatingLabels.push({
+          el,
+          actor,
+          getPos: () => actor.root.position.clone().add(new THREE.Vector3(0, 2.15, 0))
+        });
+      });
+    }
+
+    function updateBrokenUiBadges() {
+      stationNavButtonsMap.forEach((btn, id) => {
+        btn.classList.toggle('broken', simState.brokenStationId === id);
+      });
+      stationFloatingLabelMap.forEach(({ el, st }, id) => {
+        const isBroken = simState.brokenStationId === id;
+        el.classList.toggle('broken-label', isBroken);
+        if (isBroken) {
+          el.innerHTML = `<span class="tag">🚨 ${st.id}</span>¡EN REPARACIÓN!`;
+        } else {
+          el.innerHTML = `<span class="tag">${st.id}</span>${st.name.split(' ')[0]} ${st.name.split(' ')[1] || ''}`;
+        }
+      });
+    }
+
+    function updateFloatingLabels() {
+      if (renderer.xr.isPresenting) {
+        labelsContainer.style.display = 'none';
+        return;
+      }
+      labelsContainer.style.display = 'block';
+
+      const widthHalf = window.innerWidth / 2;
+      const heightHalf = window.innerHeight / 2;
+
+      floatingLabels.forEach((item) => {
+        if (item.actor) {
+          const a = item.actor;
+          if (a.repairTargetStation && simState.brokenStationId === a.repairTargetStation.id) {
+            item.el.classList.add('npc-speech-bubble');
+            if (simState.repairPhase === 'walking_to_machine') {
+              item.el.innerHTML = `<span class="tag">🏃‍♂️ ${a.data.name}:</span> En camino a reparar <strong>${a.repairTargetStation.id}</strong>...`;
+            } else {
+              const pct = Math.round(simState.repairProgress * 100);
+              item.el.innerHTML = `<span class="tag">🔧 ${a.data.name}:</span> Reparando <strong>${a.repairTargetStation.id}</strong> (${pct}%)`;
+            }
+          } else if (a.speechBubbleText) {
+            item.el.classList.add('npc-speech-bubble');
+            item.el.innerHTML = `<span class="tag">🔊 ${a.data.name}:</span> ${a.speechBubbleText}`;
+          } else if (activeDialogueNpcId === a.data.id) {
+            item.el.classList.add('npc-speech-bubble');
+            item.el.innerHTML = `<span class="tag">👀 ${a.data.name}:</span> Mirándote y escuchándote...`;
+          } else if (!simState.running && !a.inBreakCircle) {
+            item.el.classList.remove('npc-speech-bubble');
+            item.el.innerHTML = `<span class="tag">🚶 ${a.data.name}</span>(Yendo a pausa activa grupal...)`;
+          } else {
+            item.el.classList.remove('npc-speech-bubble');
+            item.el.innerHTML = `<span class="tag">💬 ${a.data.name}</span>(${a.data.stations})`;
+          }
+        }
+
+        const pos = item.getPos();
+        pos.project(camera);
+        if (pos.z > 1) {
+          item.el.style.display = 'none';
+        } else {
+          const x = (pos.x * widthHalf) + widthHalf;
+          const y = -(pos.y * heightHalf) + heightHalf;
+          item.el.style.display = 'block';
+          item.el.style.left = `${x}px`;
+          item.el.style.top = `${y}px`;
+        }
+      });
+    }
+
+    // =========================================================================
+    // 13. CONTROLES MULTIPLATAFORMA: META QUEST 2/3 (WEBXR), PC Y MÓVIL
+    // =========================================================================
+    let cameraMode = 'orbital';
+    const moveKeys = { forward: false, backward: false, left: false, right: false };
+    const joystickVec = { x: 0, y: 0 };
+    let yawAngle = 0;
+    let pitchAngle = 0;
+
+    function setCameraMode(mode) {
+      cameraMode = mode;
+      const btn = document.getElementById('btn-cam-mode');
+      const joyZone = document.getElementById('mobile-joystick-zone');
+
+      if (mode === 'walk') {
+        btn.textContent = '🚶 Modo: Recorrido 1ra Persona';
+        orbitControls.enabled = false;
+        camera.position.set(playerRig.position.x, 1.72, playerRig.position.z);
+        yawAngle = 0;
+        pitchAngle = 0;
+        camera.rotation.order = 'YXZ';
+        camera.rotation.set(pitchAngle, yawAngle, 0);
+        joyZone.style.display = 'block';
+        showToast('Modo Recorrido activo: Acércate a cualquier NPC y pulsa V o 🎤 Hablar; el NPC se detendrá y te mirará a los ojos');
+      } else {
+        btn.textContent = '🎥 Modo: Orbital';
+        orbitControls.enabled = true;
+        joyZone.style.display = 'none';
+        camera.position.set(playerRig.position.x, 14, playerRig.position.z + 14);
+        orbitControls.target.set(playerRig.position.x, 1.5, -3);
+        orbitControls.update();
+      }
+    }
+
+    document.getElementById('btn-cam-mode').addEventListener('click', () => {
+      setCameraMode(cameraMode === 'orbital' ? 'walk' : 'orbital');
+    });
+
+    function focusCameraOnTarget(targetPos, camPos) {
+      playerRig.position.set(camPos.x, 0, camPos.z);
+      if (cameraMode === 'orbital') {
+        camera.position.copy(camPos);
+        orbitControls.target.copy(targetPos);
+        orbitControls.update();
+      } else {
+        camera.position.set(camPos.x, 1.72, camPos.z);
+        camera.lookAt(targetPos.x, 1.5, targetPos.z);
+        yawAngle = camera.rotation.y;
+        pitchAngle = camera.rotation.x;
+      }
+    }
+
+    window.addEventListener('keydown', (e) => {
+      if (document.activeElement && document.activeElement.tagName === 'INPUT') return;
+      if (e.code === 'KeyW' || e.code === 'ArrowUp') moveKeys.forward = true;
+      if (e.code === 'KeyS' || e.code === 'ArrowDown') moveKeys.backward = true;
+      if (e.code === 'KeyA' || e.code === 'ArrowLeft') moveKeys.left = true;
+      if (e.code === 'KeyD' || e.code === 'ArrowRight') moveKeys.right = true;
+      if (e.code === 'KeyV') toggleMicrophoneInput(null);
+    });
+    window.addEventListener('keyup', (e) => {
+      if (e.code === 'KeyW' || e.code === 'ArrowUp') moveKeys.forward = false;
+      if (e.code === 'KeyS' || e.code === 'ArrowDown') moveKeys.backward = false;
+      if (e.code === 'KeyA' || e.code === 'ArrowLeft') moveKeys.left = false;
+      if (e.code === 'KeyD' || e.code === 'ArrowRight') moveKeys.right = false;
+    });
+
+    let isDraggingLook = false;
+    let prevPointer = { x: 0, y: 0 };
+    renderer.domElement.addEventListener('pointerdown', (e) => {
+      isDraggingLook = true;
+      prevPointer = { x: e.clientX, y: e.clientY };
+    });
+    window.addEventListener('pointermove', (e) => {
+      if (!isDraggingLook || cameraMode !== 'walk') return;
+      const dx = e.clientX - prevPointer.x;
+      const dy = e.clientY - prevPointer.y;
+      prevPointer = { x: e.clientX, y: e.clientY };
+      yawAngle -= dx * 0.0045;
+      pitchAngle = Math.max(-Math.PI / 2.6, Math.min(Math.PI / 2.6, pitchAngle - dy * 0.0045));
+      camera.rotation.order = 'YXZ';
+      camera.rotation.set(pitchAngle, yawAngle, 0);
+    });
+    window.addEventListener('pointerup', () => {
+      isDraggingLook = false;
+    });
+
+    const joyZone = document.getElementById('mobile-joystick-zone');
+    const joyKnob = document.getElementById('mobile-joystick-knob');
+    let joyTouchId = null;
+
+    joyZone.addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      const t = e.changedTouches[0];
+      joyTouchId = t.identifier;
+      updateJoystickFromTouch(t);
+    }, { passive: false });
+
+    joyZone.addEventListener('touchmove', (e) => {
+      e.preventDefault();
+      for (let i = 0; i < e.changedTouches.length; i++) {
+        if (e.changedTouches[i].identifier === joyTouchId) {
+          updateJoystickFromTouch(e.changedTouches[i]);
+        }
+      }
+    }, { passive: false });
+
+    const resetJoystick = () => {
+      joyTouchId = null;
+      joystickVec.x = 0;
+      joystickVec.y = 0;
+      joyKnob.style.transform = 'translate(0px, 0px)';
+    };
+    joyZone.addEventListener('touchend', resetJoystick);
+    joyZone.addEventListener('touchcancel', resetJoystick);
+
+    function updateJoystickFromTouch(touch) {
+      const rect = joyZone.getBoundingClientRect();
+      const cx = rect.left + rect.width / 2;
+      const cy = rect.top + rect.height / 2;
+      const maxR = rect.width / 2 - 18;
+      let dx = touch.clientX - cx;
+      let dy = touch.clientY - cy;
+      const dist = Math.hypot(dx, dy);
+      if (dist > maxR) {
+        dx = (dx / dist) * maxR;
+        dy = (dy / dist) * maxR;
+      }
+      joyKnob.style.transform = `translate(${dx}px, ${dy}px)`;
+      joystickVec.x = dx / maxR;
+      joystickVec.y = dy / maxR;
+    }
+
+    const pointerRaycaster = new THREE.Raycaster();
+    const pointerMouse = new THREE.Vector2();
+    let pointerDownPos = { x: 0, y: 0 };
+
+    renderer.domElement.addEventListener('pointerdown', (e) => {
+      pointerDownPos = { x: e.clientX, y: e.clientY };
+    });
+
+    renderer.domElement.addEventListener('pointerup', (e) => {
+      if (Math.hypot(e.clientX - pointerDownPos.x, e.clientY - pointerDownPos.y) > 8) return;
+
+      pointerMouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+      pointerMouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+      pointerRaycaster.setFromCamera(pointerMouse, camera);
+
+      const hits = pointerRaycaster.intersectObjects(interactableMeshes, false);
+      if (hits.length > 0) {
+        const hitObj = hits[0].object;
+        if (hitObj.userData.isVrUiButton) {
+          handleVrUiButtonAction(hitObj.userData.actionType);
+          return;
+        }
+        if (hitObj.userData.npcId) {
+          openNpcDialogue(hitObj.userData.npcId, false);
+          return;
+        }
+        if (hitObj.userData.stationId) {
+          openStationInspector(hitObj.userData.stationId, false);
+          return;
+        }
+      }
+    });
+
+    function handleVrUiButtonAction(actionType) {
+      if (actionType === 'close') {
+        releaseNpcFromConversation();
+        vrSpatialPanel.visible = false;
+        inspectorPanel.classList.add('hidden');
+        return;
+      }
+      if (activeVrContext && activeVrContext.type === 'station' && simState.brokenStationId === activeVrContext.station.id) {
+        if (actionType === 'optA') {
+          const st = activeVrContext.station;
+          const respNpc = st.responsibleNpc ? npcObjectsMap.get(st.responsibleNpc) : null;
+          completeMachineRepair(st, respNpc);
+        }
+        return;
+      }
+      if (activeVrContext && activeVrContext.type === 'npc') {
+        const optIdx = actionType === 'optA' ? 0 : 1;
+        const chosen = activeVrContext.npc.dialogue.options[optIdx];
+        if (chosen) {
+          const actor = npcObjectsMap.get(activeVrContext.npcId);
+          if (actor && chosen.triggerAnim) {
+            actor.currentAnim = chosen.triggerAnim;
+            actor.forcedAnimTimer = 6.0;
+          }
+          openNpcDialogue(activeVrContext.npcId, false, chosen.answer, chosen.label);
+        }
+      }
+    }
+
+    // =========================================================================
+    // 14. CONFIGURACIÓN NATIVA WEBXR PARA META QUEST 2 & META QUEST 3
+    // =========================================================================
+    const controllerModelFactory = new XRControllerModelFactory();
+    const vrControllers = [];
+    const vrLaserRaycaster = new THREE.Raycaster();
+    const tempMatrix = new THREE.Matrix4();
+
+    const teleportReticle = new THREE.Mesh(
+      new THREE.RingGeometry(0.28, 0.38, 24),
+      new THREE.MeshBasicMaterial({ color: 0x38bdf8, side: THREE.DoubleSide })
+    );
+    teleportReticle.rotation.x = -Math.PI / 2;
+    teleportReticle.position.y = 0.04;
+    teleportReticle.visible = false;
+    scene.add(teleportReticle);
+
+    for (let i = 0; i < 2; i++) {
+      const controller = renderer.xr.getController(i);
+      const lineGeo = new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(0, 0, 0),
+        new THREE.Vector3(0, 0, -8)
+      ]);
+      const lineMat = new THREE.LineBasicMaterial({ color: 0x38bdf8 });
+      const laserLine = new THREE.Line(lineGeo, lineMat);
+      controller.add(laserLine);
+
+      controller.addEventListener('selectstart', () => onVrControllerSelect(controller));
+
+      playerRig.add(controller);
+      vrControllers.push(controller);
+
+      const grip = renderer.xr.getControllerGrip(i);
+      grip.add(controllerModelFactory.createControllerModel(grip));
+      playerRig.add(grip);
+    }
+
+    function onVrControllerSelect(controller) {
+      tempMatrix.identity().extractRotation(controller.matrixWorld);
+      vrLaserRaycaster.ray.origin.setFromMatrixPosition(controller.matrixWorld);
+      vrLaserRaycaster.ray.direction.set(0, 0, -1).applyMatrix4(tempMatrix);
+
+      const uiAndEntityHits = vrLaserRaycaster.intersectObjects(interactableMeshes, false);
+      if (uiAndEntityHits.length > 0) {
+        const hit = uiAndEntityHits[0].object;
+        if (hit.userData.isVrUiButton) {
+          handleVrUiButtonAction(hit.userData.actionType);
+          return;
+        }
+        if (hit.userData.npcId) {
+          openNpcDialogue(hit.userData.npcId, false);
+          return;
+        }
+        if (hit.userData.stationId) {
+          openStationInspector(hit.userData.stationId, false);
+          return;
+        }
+      }
+
+      const floorHits = vrLaserRaycaster.intersectObjects(teleportMeshes, false);
+      if (floorHits.length > 0) {
+        const pt = floorHits[0].point;
+        playerRig.position.set(pt.x, 0, pt.z);
+        if (floorHits[0].object.userData.isStationPad) {
+          openStationInspector(floorHits[0].object.userData.stationId, false);
+        }
+      }
+    }
+
+    let snapTurnCooldown = 0;
+
+    function updateVrLocomotion(dt) {
+      if (!renderer.xr.isPresenting) {
+        teleportReticle.visible = false;
+        return;
+      }
+
+      if (snapTurnCooldown > 0) snapTurnCooldown -= dt;
+
+      const activeCtrl = vrControllers[1] || vrControllers[0];
+      if (activeCtrl) {
+        tempMatrix.identity().extractRotation(activeCtrl.matrixWorld);
+        vrLaserRaycaster.ray.origin.setFromMatrixPosition(activeCtrl.matrixWorld);
+        vrLaserRaycaster.ray.direction.set(0, 0, -1).applyMatrix4(tempMatrix);
+        const hits = vrLaserRaycaster.intersectObjects(teleportMeshes, false);
+        if (hits.length > 0) {
+          teleportReticle.visible = true;
+          teleportReticle.position.set(hits[0].point.x, 0.04, hits[0].point.z);
+        } else {
+          teleportReticle.visible = false;
+        }
+      }
+
+      const session = renderer.xr.getSession();
+      if (!session) return;
+
+      for (const source of session.inputSources) {
+        if (!source.gamepad) continue;
+        const axes = source.gamepad.axes;
+        if (axes.length < 4) continue;
+
+        const thumbX = axes[2];
+        const thumbY = axes[3];
+
+        if (source.handedness === 'left') {
+          if (Math.abs(thumbX) > 0.15 || Math.abs(thumbY) > 0.15) {
+            const xrCam = renderer.xr.getCamera();
+            const forward = new THREE.Vector3();
+            xrCam.getWorldDirection(forward);
+            forward.y = 0;
+            forward.normalize();
+
+            const right = new THREE.Vector3().crossVectors(forward, new THREE.Vector3(0, 1, 0)).normalize();
+            playerRig.position.addScaledVector(forward, -thumbY * dt * 4.5);
+            playerRig.position.addScaledVector(right, thumbX * dt * 4.5);
+          }
+        } else if (source.handedness === 'right') {
+          if (Math.abs(thumbX) > 0.65 && snapTurnCooldown <= 0) {
+            playerRig.rotation.y -= Math.sign(thumbX) * (Math.PI / 5);
+            snapTurnCooldown = 0.35;
+          }
+        }
+      }
+    }
+
+    const btnEnterVr = document.getElementById('btn-enter-vr');
+    let currentXrSession = null;
+
+    btnEnterVr.addEventListener('click', async () => {
+      if (currentXrSession) {
+        await currentXrSession.end();
+        return;
+      }
+
+      if (!('xr' in navigator)) {
+        setCameraMode('walk');
+        showToast('WebXR no detectado en este navegador: Activado Modo Recorrido 3D interactivo');
+        return;
+      }
+
+      try {
+        const supported = await navigator.xr.isSessionSupported('immersive-vr');
+        if (!supported) {
+          setCameraMode('walk');
+          showToast('Visor VR no conectado: Activado Modo Recorrido 1ra Persona para probar en pantalla');
+          return;
+        }
+
+        const session = await navigator.xr.requestSession('immersive-vr', {
+          optionalFeatures: ['local-floor', 'bounded-floor', 'hand-tracking']
+        });
+
+        currentXrSession = session;
+        playerRig.add(camera);
+        await renderer.xr.setSession(session);
+        btnEnterVr.textContent = '🚪 Salir de VR';
+
+        session.addEventListener('end', () => {
+          currentXrSession = null;
+          scene.add(camera);
+          btnEnterVr.textContent = '🥽 Entrar en VR (Quest 2/3)';
+          setCameraMode('orbital');
+        });
+      } catch (err) {
+        setCameraMode('walk');
+        showToast('Modo Recorrido 3D activado (Abre desde el navegador de tu Meta Quest 2/3 para VR inmersivo)');
+      }
+    });
+
+    // =========================================================================
+    // 15. BOTONES DE SIMULACIÓN SCADA, PAUSA SOCIAL Y REPARACIÓN
+    // =========================================================================
+    function showToast(msg) {
+      const toast = document.getElementById('toast-banner');
+      toast.textContent = msg;
+      toast.classList.add('visible');
+      clearTimeout(showToast._timer);
+      showToast._timer = setTimeout(() => toast.classList.remove('visible'), 5000);
+    }
+
+    function updateHudMetrics() {
+      document.getElementById('metric-count').textContent = `${simState.bottlesOk} / ${simState.bottlesRejected}`;
+      const isHalted = !simState.running || (simState.brokenStationId !== null);
+      const bph = isHalted ? 0 : Math.round(24000 * simState.speedMultiplier);
+      document.getElementById('metric-bph').textContent = `${bph.toLocaleString()} BPH`;
+
+      const profile = SPEED_PROFILES[simState.speedProfileIdx];
+      const riskEl = document.getElementById('metric-risk');
+      riskEl.textContent = profile.label;
+      riskEl.style.color = profile.color;
+
+      const healthEl = document.getElementById('metric-health');
+      const dot = document.getElementById('line-status-dot');
+      if (simState.brokenStationId) {
+        healthEl.textContent = `🔧 Reparando ${simState.brokenStationId}`;
+        healthEl.style.color = '#ef4444';
+        dot.style.background = '#ef4444';
+        dot.style.boxShadow = '0 0 10px #ef4444';
+      } else if (!simState.running) {
+        healthEl.textContent = '☕ Pausa Social NPC';
+        healthEl.style.color = '#38bdf8';
+        dot.style.background = '#f59e0b';
+        dot.style.boxShadow = '0 0 10px #f59e0b';
+      } else {
+        healthEl.textContent = '8/8 OK';
+        healthEl.style.color = '#10b981';
+        dot.style.background = '#10b981';
+        dot.style.boxShadow = '0 0 8px #10b981';
+      }
+    }
+
+    document.getElementById('btn-toggle-drawer').addEventListener('click', () => {
+      document.getElementById('left-drawer').classList.toggle('collapsed');
+    });
+
+    document.getElementById('btn-sim-toggle').addEventListener('click', (e) => {
+      simState.running = !simState.running;
+      if (simState.running) {
+        e.currentTarget.textContent = '⏸ Parar Todas las Máquinas';
+        e.currentTarget.classList.add('active');
+        npcActors.forEach((a) => {
+          a.inBreakCircle = false;
+          a.coffeeCupMesh.visible = false;
+          a.state = 'walking';
+          showNpcOverheadSpeech(a, '💪 ¡Línea reactivada! Regresando a mi estación.', 4.5);
+        });
+        showToast('▶ Máquinas en marcha: Rubén, Lima y Javier guardan su café y regresan a sus estaciones');
+      } else {
+        e.currentTarget.textContent = '▶ Reanudar Todas las Máquinas';
+        e.currentTarget.classList.remove('active');
+        releaseNpcFromConversation();
+        simState.socialChatterTimer = 1.2;
+        npcActors.forEach((a) => {
+          showNpcOverheadSpeech(a, '☕ Máquinas detenidas: Yendo al pasillo central a charlar con el equipo...', 5.0);
+        });
+        // Enfocar suavemente la cámara hacia el punto de encuentro donde se reúnen los 3 NPCs
+        focusCameraOnTarget(BREAK_MEETING_CENTER.clone().add(new THREE.Vector3(0, 1.2, 0)), new THREE.Vector3(-10.0, 5.2, 9.5));
+        showToast('☕ Máquinas detenidas: Los 3 operadores dejan de trabajar, se reúnen en círculo a tomar café, hacen pausa activa y charlan entre ellos');
+      }
+      updateHudMetrics();
+    });
+
+    document.getElementById('btn-sim-speed').addEventListener('click', (e) => {
+      simState.speedProfileIdx = (simState.speedProfileIdx + 1) % SPEED_PROFILES.length;
+      const profile = SPEED_PROFILES[simState.speedProfileIdx];
+      simState.speedMultiplier = profile.mult;
+      e.currentTarget.textContent = `⚡ Vel. Máquinas: ${simState.speedMultiplier.toFixed(1)}x`;
+      updateHudMetrics();
+      showToast(`Velocidad de máquinas y cinta ajustada a ${simState.speedMultiplier.toFixed(1)}x (Riesgo de avería: ${profile.label})`);
+    });
+
+    document.getElementById('btn-force-breakdown').addEventListener('click', () => {
+      if (simState.brokenStationId) {
+        showToast(`⏳ Ya hay una reparación en curso en ${simState.brokenStationId} — observa al NPC frente a la máquina`);
+        return;
+      }
+      triggerMachineBreakdown();
+    });
+
+    document.getElementById('btn-sim-reject').addEventListener('click', () => {
+      simState.forceRejectNext = true;
+      const lima = npcObjectsMap.get('npc-lima');
+      if (lima) {
+        lima.currentAnim = 'Pick_Rejected_Bottle';
+        lima.forcedAnimTimer = 7.0;
+      }
+      focusCameraOnTarget(new THREE.Vector3(10, 1.4, -4), new THREE.Vector3(10, 3.2, 1.5));
+      showToast('🎯 Prueba de rechazo activada en ST-04 FBI: La próxima botella será desviada por el pistón neumático');
+    });
+
+    document.getElementById('btn-sim-cip').addEventListener('click', (e) => {
+      simState.cipActive = !simState.cipActive;
+      e.currentTarget.classList.toggle('active', simState.cipActive);
+      const javier = npcObjectsMap.get('npc-javier');
+      if (simState.cipActive && javier) {
+        javier.currentAnim = 'Operate_CIP_Valves';
+        javier.forcedAnimTimer = 8.0;
+        openNpcDialogue('npc-javier', true);
+        showToast('🧪 Ciclo CIP activo: Bombeando sosa cáustica a 80°C y ácido peracético por tubería AISI 316L');
+      } else {
+        showToast('Ciclo de sanitización CIP finalizado');
+      }
+    });
+
+    document.getElementById('btn-reset-view').addEventListener('click', () => {
+      setCameraMode('orbital');
+      camera.position.set(-4, 18, 28);
+      orbitControls.target.set(2, 2, -2);
+      orbitControls.update();
+    });
+
+    // =========================================================================
+    // 16. BUCLE PRINCIPAL DE ANIMACIÓN Y RENDERIZADO
+    // =========================================================================
+    buildIndustrialHall();
+    buildConveyorsAndPiping();
+    buildAllStations();
+    initBottlesFlow();
+    initNpcs();
+    initFloatingLabels();
+
+    openStationInspector('ST-02', false, false);
+
+    const clock = new THREE.Clock();
+
+    function updateDesktopWalkMovement(dt) {
+      if (renderer.xr.isPresenting || cameraMode !== 'walk') return;
+
+      const forwardInput = (moveKeys.forward ? 1 : 0) - (moveKeys.backward ? 1 : 0) - joystickVec.y;
+      const strafeInput = (moveKeys.right ? 1 : 0) - (moveKeys.left ? 1 : 0) + joystickVec.x;
+
+      if (Math.abs(forwardInput) > 0.01 || Math.abs(strafeInput) > 0.01) {
+        const forward = new THREE.Vector3(0, 0, -1).applyAxisAngle(new THREE.Vector3(0, 1, 0), yawAngle);
+        const right = new THREE.Vector3(1, 0, 0).applyAxisAngle(new THREE.Vector3(0, 1, 0), yawAngle);
+        camera.position.addScaledVector(forward, forwardInput * dt * 7.5);
+        camera.position.addScaledVector(right, strafeInput * dt * 7.5);
+        camera.position.y = 1.72;
+        playerRig.position.set(camera.position.x, 0, camera.position.z);
+      }
+    }
+
+    renderer.setAnimationLoop(() => {
+      const dt = Math.min(clock.getDelta(), 0.1);
+      const elapsed = clock.getElapsedTime();
+
+      updateBottlesAndMachines(dt, elapsed);
+      updateNpcs(dt, elapsed);
+      updateDesktopWalkMovement(dt);
+      updateVrLocomotion(dt);
+
+      if (!renderer.xr.isPresenting && cameraMode === 'orbital') {
+        orbitControls.update();
+      }
+
+      updateFloatingLabels();
+      renderer.render(scene, camera);
+    });
+
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+  </script>
+</body>
+</html>
